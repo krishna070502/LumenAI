@@ -1,13 +1,15 @@
 'use client';
 
 import { useAuth } from '@/lib/auth/useAuth';
-import { LogIn, LogOut, User } from 'lucide-react';
+import { LogIn, LogOut, User, Settings } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import SettingsDialogue from '@/components/Settings/SettingsDialogue';
 
 export default function UserAvatar() {
     const { user, isAuthenticated, logout, login, loading } = useAuth();
     const [showMenu, setShowMenu] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -51,7 +53,7 @@ export default function UserAvatar() {
                 {initial}
             </button>
             {showMenu && (
-                <div className="absolute left-full ml-2 bottom-0 w-48 rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 shadow-lg p-1 z-50">
+                <div className="absolute bottom-full mb-2 right-0 lg:bottom-0 lg:left-full lg:ml-2 lg:right-auto w-48 rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 shadow-lg p-1 z-[100]">
                     <div className="px-3 py-2 border-b border-light-200 dark:border-dark-200">
                         <p className="text-sm font-medium text-black dark:text-white truncate">
                             {user.name || 'User'}
@@ -60,6 +62,16 @@ export default function UserAvatar() {
                             {user.email}
                         </p>
                     </div>
+                    <button
+                        onClick={() => {
+                            setShowSettings(true);
+                            setShowMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-black/70 dark:text-white/70 hover:bg-light-200 dark:hover:bg-dark-200 rounded-md transition duration-200"
+                    >
+                        <Settings size={16} />
+                        <span>Settings</span>
+                    </button>
                     <button
                         onClick={() => {
                             logout();
@@ -72,6 +84,7 @@ export default function UserAvatar() {
                     </button>
                 </div>
             )}
+            <SettingsDialogue isOpen={showSettings} setIsOpen={setShowSettings} />
         </div>
     );
 }

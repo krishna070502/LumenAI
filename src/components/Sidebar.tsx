@@ -112,25 +112,26 @@ const Sidebar = ({ children }: { children: React.ReactNode }) => {
         </div>
       </div>
 
-      <div className="fixed bottom-0 w-full z-50 flex flex-row items-center gap-x-6 bg-light-secondary dark:bg-dark-secondary px-4 py-4 shadow-sm lg:hidden">
+      <div className="fixed bottom-0 w-full z-50 flex flex-row items-center justify-around bg-light-secondary dark:bg-dark-secondary px-4 py-4 shadow-sm lg:hidden">
         {navLinks.map((link, i) => (
           <Link
             href={link.href}
             key={i}
             className={cn(
-              'relative flex flex-col items-center space-y-1 text-center w-full',
+              'relative flex flex-col items-center space-y-1 text-center',
               link.active
                 ? 'text-black dark:text-white'
                 : 'text-black dark:text-white/70',
             )}
           >
             {link.active && (
-              <div className="absolute top-0 -mt-4 h-1 w-full rounded-b-lg bg-black dark:bg-white" />
+              <div className="absolute top-0 -mt-4 h-1 w-8 rounded-b-lg bg-black dark:bg-white" />
             )}
-            <link.icon />
+            <link.icon size={22} />
             <p className="text-xs">{link.label}</p>
           </Link>
         ))}
+        <UserAvatar />
       </div>
 
       <Layout>{children}</Layout>

@@ -2,7 +2,7 @@
 
 import DeleteChat from '@/components/DeleteChat';
 import { formatTimeDifference } from '@/lib/utils';
-import { BookOpenText, ClockIcon, FileText, Globe2Icon, Bookmark, Trash2, ExternalLink } from 'lucide-react';
+import { BookOpenText, ClockIcon, FileText, Globe2Icon, Bookmark, Trash2, ExternalLink, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -32,6 +32,18 @@ const Page = () => {
   const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingsLoading, setSavingsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter chats based on search query
+  const filteredChats = chats.filter(chat =>
+    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Filter saved articles based on search query
+  const filteredArticles = savedArticles.filter(article =>
+    article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (article.source?.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   useEffect(() => {
     const fetchChats = async () => {
@@ -130,6 +142,28 @@ const Page = () => {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="px-2 pt-4">
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={activeTab === 'chats' ? 'Search chats...' : 'Search saved articles...'}
+            className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary text-black dark:text-white placeholder-black/40 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40 hover:text-black/60 dark:hover:text-white/60 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Tabs */}
       <div className="flex gap-1 px-2 pt-4 border-b border-light-200/20 dark:border-dark-200/20">
         <button
@@ -180,25 +214,27 @@ const Page = () => {
                 />
               </svg>
             </div>
-          ) : chats.length === 0 ? (
+          ) : filteredChats.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[70vh] px-2 text-center">
               <div className="flex items-center justify-center w-12 h-12 rounded-2xl border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary">
-                <BookOpenText className="text-black/70 dark:text-white/70" />
+                {searchQuery ? <Search className="text-black/70 dark:text-white/70" /> : <BookOpenText className="text-black/70 dark:text-white/70" />}
               </div>
               <p className="mt-2 text-black/70 dark:text-white/70 text-sm">
-                No chats found.
+                {searchQuery ? `No chats matching "${searchQuery}"` : 'No chats found.'}
               </p>
-              <p className="mt-1 text-black/70 dark:text-white/70 text-sm">
-                <Link href="/" className="text-sky-400">
-                  Start a new chat
-                </Link>{' '}
-                to see it listed here.
-              </p>
+              {!searchQuery && (
+                <p className="mt-1 text-black/70 dark:text-white/70 text-sm">
+                  <Link href="/" className="text-sky-400">
+                    Start a new chat
+                  </Link>{' '}
+                  to see it listed here.
+                </p>
+              )}
             </div>
           ) : (
             <div className="pt-6 pb-28 px-2">
               <div className="rounded-2xl border border-light-200 dark:border-dark-200 overflow-hidden bg-light-primary dark:bg-dark-primary">
-                {chats.map((chat, index) => {
+                {filteredChats.map((chat, index) => {
                   const sourcesLabel =
                     chat.sources.length === 0
                       ? null
@@ -216,7 +252,7 @@ const Page = () => {
                       key={chat.id}
                       className={
                         'group flex flex-col gap-2 p-4 hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors duration-200 ' +
-                        (index !== chats.length - 1
+                        (index !== filteredChats.length - 1
                           ? 'border-b border-light-200 dark:border-dark-200'
                           : '')
                       }
@@ -289,25 +325,27 @@ const Page = () => {
                 />
               </svg>
             </div>
-          ) : savedArticles.length === 0 ? (
+          ) : filteredArticles.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[70vh] px-2 text-center">
               <div className="flex items-center justify-center w-12 h-12 rounded-2xl border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary">
-                <Bookmark className="text-black/70 dark:text-white/70" />
+                {searchQuery ? <Search className="text-black/70 dark:text-white/70" /> : <Bookmark className="text-black/70 dark:text-white/70" />}
               </div>
               <p className="mt-2 text-black/70 dark:text-white/70 text-sm">
-                No saved articles yet.
+                {searchQuery ? `No articles matching "${searchQuery}"` : 'No saved articles yet.'}
               </p>
-              <p className="mt-1 text-black/70 dark:text-white/70 text-sm">
-                <Link href="/discover" className="text-sky-400">
-                  Discover articles
-                </Link>{' '}
-                and save them for later.
-              </p>
+              {!searchQuery && (
+                <p className="mt-1 text-black/70 dark:text-white/70 text-sm">
+                  <Link href="/discover" className="text-sky-400">
+                    Discover articles
+                  </Link>{' '}
+                  and save them for later.
+                </p>
+              )}
             </div>
           ) : (
             <div className="pt-6 pb-28 px-2">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {savedArticles.map((article) => (
+                {filteredArticles.map((article) => (
                   <div
                     key={article.id}
                     className="group rounded-2xl border border-light-200 dark:border-dark-200 overflow-hidden bg-light-primary dark:bg-dark-primary hover:shadow-lg transition-shadow"
