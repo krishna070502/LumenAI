@@ -135,8 +135,8 @@ const Page = () => {
         <button
           onClick={() => setActiveTab('chats')}
           className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'chats'
-              ? 'bg-light-secondary dark:bg-dark-secondary text-black dark:text-white border-b-2 border-purple-500'
-              : 'text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white'
+            ? 'bg-light-secondary dark:bg-dark-secondary text-black dark:text-white border-b-2 border-purple-500'
+            : 'text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white'
             }`}
         >
           <span className="flex items-center gap-2">
@@ -147,8 +147,8 @@ const Page = () => {
         <button
           onClick={() => setActiveTab('saved')}
           className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'saved'
-              ? 'bg-light-secondary dark:bg-dark-secondary text-black dark:text-white border-b-2 border-purple-500'
-              : 'text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white'
+            ? 'bg-light-secondary dark:bg-dark-secondary text-black dark:text-white border-b-2 border-purple-500'
+            : 'text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white'
             }`}
         >
           <span className="flex items-center gap-2">

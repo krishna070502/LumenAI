@@ -15,11 +15,11 @@
 
 /* Subtle gradient background effect */
 .gradient-bg {
-  background-color: #ffffff;
+  background-color: #f8fafc;
   background-image:
-    radial-gradient(ellipse 80% 50% at 20% 30%, rgba(120, 119, 198, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 50% at 85% 60%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 40% at 50% 90%, rgba(147, 51, 234, 0.06) 0%, transparent 50%);
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 90% 30%, rgba(244, 114, 182, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 50% at 50% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 50%);
   background-attachment: fixed;
 }
 
@@ -28,9 +28,9 @@ html.dark .gradient-bg,
 .dark .gradient-bg {
   background-color: #0d1117;
   background-image:
-    radial-gradient(ellipse 80% 50% at 20% 30%, rgba(120, 119, 198, 0.18) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 50% at 85% 60%, rgba(99, 102, 241, 0.12) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 40% at 50% 90%, rgba(147, 51, 234, 0.1) 0%, transparent 50%);
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(56, 189, 248, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 90% 30%, rgba(244, 114, 182, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 50% at 50% 80%, rgba(168, 85, 247, 0.08) 0%, transparent 50%);
   background-attachment: fixed;
 }
 

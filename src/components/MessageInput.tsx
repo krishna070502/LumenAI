@@ -84,7 +84,10 @@ const MessageInput = () => {
       />
       {mode === 'single' && (
         <div className="flex flex-row items-center space-x-2">
-          <ChatModeToggle />
+          {/* Hide toggle on mobile for single-line mode to save space */}
+          <div className="hidden sm:block">
+            <ChatModeToggle />
+          </div>
           <button
             disabled={message.trim().length === 0 || loading}
             className={cn(

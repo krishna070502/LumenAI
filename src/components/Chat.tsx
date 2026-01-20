@@ -58,7 +58,7 @@ const Chat = () => {
   }, [messages]);
 
   return (
-    <div className="flex flex-col space-y-6 pt-8 pb-44 lg:pb-28 sm:mx-4 md:mx-8">
+    <div className="flex flex-col space-y-6 pt-20 lg:pt-24 pb-32 lg:pb-28 px-4 md:px-8 overflow-x-hidden">
       {sections.map((section, i) => {
         const isLast = i === sections.length - 1;
 
@@ -80,7 +80,7 @@ const Chat = () => {
       <div ref={messageEnd} className="h-0" />
       {dividerWidth > 0 && (
         <div
-          className="fixed z-40 bottom-24 lg:bottom-6"
+          className="fixed z-40 bottom-20 lg:bottom-6"
           style={{ width: dividerWidth, left: dividerLeft }}
         >
           <div

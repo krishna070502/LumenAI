@@ -83,8 +83,8 @@ export class MemoryManager {
                 })
                     .from(memories)
                     .where(eq(memories.userId, userId))
-                    .orderBy(desc(memories.lastAccessedAt))
-                    .limit(topK);
+                    .orderBy(desc(memories.importance), desc(memories.lastAccessedAt))
+                    .limit(20); // Fetch more memories in fallback mode
 
                 console.log(`[MemoryManager] Fallback found ${allMemories.length} total memories for user`);
 
@@ -183,6 +183,12 @@ export class MemoryManager {
      * Extract new facts from a conversation fragment.
      */
     static async extractMemories(llm: any, messages: Message[]): Promise<Memory[]> {
+        // Guard: Skip if no LLM provided
+        if (!llm) {
+            console.warn('[MemoryManager] No LLM provided for memory extraction, skipping.');
+            return [];
+        }
+
         const prompt = `
       Analyze the following chat history and extract a list of NEW, MEANINGFUL personal facts, research interests, or specific areas of knowledge the user cares about.
       
