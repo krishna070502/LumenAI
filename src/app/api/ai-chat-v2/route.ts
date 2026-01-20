@@ -14,6 +14,7 @@ import { searchSearxng } from '@/lib/searxng';
 import TurnDown from 'turndown';
 import ModelRegistry from '@/lib/models/registry';
 import { MemoryManager } from '@/lib/memory/manager';
+import UploadManager from '@/lib/uploads/manager';
 
 const turndown = new TurnDown();
 const yf = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
@@ -68,10 +69,35 @@ export async function POST(req: Request) {
         if (!user) return Response.json({ message: 'Unauthorized' }, { status: 401 });
 
         const body = await req.json();
-        const { message, history, chatId, messageId, systemInstructions, sources = [], optimizationMode = 'balanced', chatMode = 'chat', memoryEnabled = true } = body;
+        const { message, history, chatId, messageId, systemInstructions, sources = [], optimizationMode = 'balanced', chatMode = 'chat', memoryEnabled = true, files = [] } = body;
         if (!message?.content) return Response.json({ message: 'No content' }, { status: 400 });
 
         await ensureChatExists({ id: chatId, userId: user.id, query: message.content, chatMode });
+
+        // Retrieve Document Context from uploaded files
+        let documentContext = '';
+        if (files && files.length > 0) {
+            console.log(`[ai-chat-v2] Processing ${files.length} attached files...`);
+            const allChunks: string[] = [];
+            for (const fileId of files) {
+                try {
+                    const file = UploadManager.getFile(fileId);
+                    const chunks = UploadManager.getFileChunks(fileId);
+                    if (chunks.length > 0) {
+                        // Take first 10 chunks (most relevant context)
+                        const relevantChunks = chunks.slice(0, 10).map(c => c.content);
+                        allChunks.push(`--- Document: ${file?.name || fileId} ---\n${relevantChunks.join('\n')}`);
+                        console.log(`[ai-chat-v2] Retrieved ${relevantChunks.length} chunks from file ${file?.name || fileId}`);
+                    }
+                } catch (err) {
+                    console.error(`[ai-chat-v2] Failed to retrieve chunks for file ${fileId}:`, err);
+                }
+            }
+            if (allChunks.length > 0) {
+                documentContext = `\n\nATTACHED DOCUMENTS:\nThe user has attached the following document(s). Use this content to answer their questions:\n\n${allChunks.join('\n\n')}\n\n--- End of Documents ---`;
+                console.log(`[ai-chat-v2] Document context prepared with ${allChunks.length} documents.`);
+            }
+        }
 
         // Retrieve User Memories - Resilient Selection
         let retrievedMemories: any[] = [];
@@ -233,8 +259,8 @@ You have established context with this user from previous conversations. Use thi
 <user_context>
 ${retrievedMemories.map(m => `- ${m.content}`).join('\n')}
 </user_context>` : ''}
-
-Remember: Make your responses visually appealing and easy to scan. Be helpful, be human, be you! Never say things like "we're starting fresh" or "blank slate" - if you have context about the user, use it naturally.`;
+${documentContext}
+Remember: Make your responses visually appealing and easy to scan. Be helpful, be human, be you! Never say things like "we're starting fresh" or "blank slate" - if you have context about the user, use it naturally.${documentContext ? ' When the user asks about attached documents, summarize, analyze, or answer based on the document content provided above.' : ''}`;
 
         const session = new SessionManager(messageId);
         (SessionManager as any).sessions.set(messageId, session);

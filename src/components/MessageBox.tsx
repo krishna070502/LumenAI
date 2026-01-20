@@ -15,6 +15,7 @@ import {
   Sparkles,
   Bot,
   BadgeCheck,
+  FileText,
 } from 'lucide-react';
 import Markdown, { MarkdownToJSX, RuleType } from 'markdown-to-jsx';
 import Copy from './MessageActions/Copy';
@@ -65,6 +66,7 @@ const MessageBox = ({
     chatHistory,
     chatMode,
     chatModelProvider,
+    files,
   } = useChat();
 
   const parsedMessage = section.parsedTextBlocks.join('\n\n');
@@ -133,12 +135,26 @@ const MessageBox = ({
     return (
       <div className="flex flex-col space-y-6 w-full max-w-3xl mx-auto">
         {/* User Message - Right-aligned pill style */}
-        <div className="flex flex-col items-end w-full">
+        <div className="flex flex-col items-end w-full gap-2">
           <div className="bg-[#f4f4f4] dark:bg-[#2f2f2f] text-black dark:text-white px-5 py-2.5 rounded-[24px] max-w-[85%] shadow-sm">
             <div className="text-[17px] leading-relaxed whitespace-pre-wrap">
               {section.message.query}
             </div>
           </div>
+          {/* Attached Files Display */}
+          {sectionIndex === messages.length - 1 && files.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-end max-w-[85%]">
+              {files.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-light-200 dark:bg-dark-200 border border-light-300 dark:border-dark-300 text-xs text-black/70 dark:text-white/70"
+                >
+                  <FileText size={14} className="text-purple-500" />
+                  <span className="truncate max-w-[150px]">{file.fileName}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* AI Message - Minimalist style (No bubble) */}
