@@ -1,23 +1,27 @@
 import { Dialog, DialogPanel } from '@headlessui/react';
 import {
   ArrowLeft,
+  Brain,
   BrainCog,
   ChevronLeft,
   ExternalLink,
   Search,
   Sliders,
   ToggleRight,
+  Users,
 } from 'lucide-react';
 import Preferences from './Sections/Preferences';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from 'sonner'
 import Loader from '../ui/Loader';
 import { cn } from '@/lib/utils';
 import Models from './Sections/Models/Section';
 import SearchSection from './Sections/Search';
 import Select from '@/components/ui/Select';
 import Personalization from './Sections/Personalization';
+import MemorySection from './Sections/Memory';
+import GuestLimits from './Sections/GuestLimits';
 import { useAdmin } from '@/lib/auth/useAdmin';
 
 const allSections = [
@@ -40,6 +44,15 @@ const allSections = [
     adminOnly: false,
   },
   {
+    key: 'memory',
+    name: 'Memory',
+    description: 'View and manage what the AI remembers about you.',
+    icon: Brain,
+    component: MemorySection,
+    dataAdd: 'memory',
+    adminOnly: false,
+  },
+  {
     key: 'models',
     name: 'Models',
     description: 'Connect to AI services and manage connections.',
@@ -55,6 +68,15 @@ const allSections = [
     icon: Search,
     component: SearchSection,
     dataAdd: 'search',
+    adminOnly: true,
+  },
+  {
+    key: 'guestLimits',
+    name: 'Guest Limits',
+    description: 'Configure usage limits for non-logged-in users.',
+    icon: Users,
+    component: GuestLimits,
+    dataAdd: 'guestLimits',
     adminOnly: true,
   },
 ];
@@ -172,15 +194,6 @@ const SettingsDialogue = ({
                   <p className="text-xs text-black/70 dark:text-white/70">
                     Version: {process.env.NEXT_PUBLIC_VERSION}
                   </p>
-                  <a
-                    href="https://github.com/your-org/gradia-aiengine"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-black/70 dark:text-white/70 flex flex-row space-x-1 items-center transition duration-200 hover:text-black/90 hover:dark:text-white/90"
-                  >
-                    <span>GitHub</span>
-                    <ExternalLink size={12} />
-                  </a>
                 </div>
               </div>
               <div className="w-full flex flex-col overflow-hidden">

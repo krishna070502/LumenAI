@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import Sources from './MessageInputActions/Sources';
@@ -6,6 +6,8 @@ import Optimization from './MessageInputActions/Optimization';
 import Attach from './MessageInputActions/Attach';
 import { useChat } from '@/lib/hooks/useChat';
 import ModelSelector from './MessageInputActions/ChatModelSelector';
+import ChatModeToggle from './MessageInputActions/ChatModeToggle';
+import { cn } from '@/lib/utils';
 
 const EmptyChatMessageInput = () => {
   const { sendMessage } = useChat();
@@ -65,7 +67,10 @@ const EmptyChatMessageInput = () => {
           placeholder="Ask anything..."
         />
         <div className="flex flex-row items-center justify-between mt-4">
-          <Optimization />
+          <div className="flex flex-row items-center space-x-1">
+            <Optimization />
+            <ChatModeToggle />
+          </div>
           <div className="flex flex-row items-center space-x-2">
             <div className="flex flex-row items-center space-x-1">
               <Sources />
@@ -74,9 +79,25 @@ const EmptyChatMessageInput = () => {
             </div>
             <button
               disabled={message.trim().length === 0}
-              className="bg-sky-500 text-white disabled:text-black/50 dark:disabled:text-white/50 disabled:bg-[#e0e0dc] dark:disabled:bg-[#ececec21] hover:bg-opacity-85 transition duration-100 rounded-full p-2"
+              className={cn(
+                "relative group rounded-full p-2.5 transition-all duration-300",
+                message.trim().length > 0
+                  ? "bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 hover:from-purple-600 hover:via-purple-700 hover:to-indigo-700 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/40 active:scale-95"
+                  : "bg-light-100 dark:bg-dark-100 border border-light-200 dark:border-dark-200"
+              )}
             >
-              <ArrowRight className="bg-background" size={17} />
+              <Send
+                size={16}
+                className={cn(
+                  "transition-all duration-300",
+                  message.trim().length > 0
+                    ? "text-white"
+                    : "text-black/30 dark:text-white/30"
+                )}
+              />
+              {message.trim().length > 0 && (
+                <span className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300" />
+              )}
             </button>
           </div>
         </div>

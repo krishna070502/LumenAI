@@ -37,16 +37,21 @@ const getStepTitle = (
   if (step.type === 'reasoning') {
     return isStreaming && !step.reasoning ? 'Thinking...' : 'Thinking';
   } else if (step.type === 'searching') {
-    return `Searching ${step.searching.length} ${step.searching.length === 1 ? 'query' : 'queries'}`;
+    const count = step.searching?.length ?? 0;
+    return `Searching ${count} ${count === 1 ? 'query' : 'queries'}`;
   } else if (step.type === 'search_results') {
-    return `Found ${step.reading.length} ${step.reading.length === 1 ? 'result' : 'results'}`;
+    const count = step.reading?.length ?? 0;
+    return `Found ${count} ${count === 1 ? 'result' : 'results'}`;
   } else if (step.type === 'reading') {
-    return `Reading ${step.reading.length} ${step.reading.length === 1 ? 'source' : 'sources'}`;
+    const count = step.reading?.length ?? 0;
+    return `Reading ${count} ${count === 1 ? 'source' : 'sources'}`;
   } else if (step.type === 'upload_searching') {
     return 'Scanning your uploaded documents';
   } else if (step.type === 'upload_search_results') {
-    return `Reading ${step.results.length} ${step.results.length === 1 ? 'document' : 'documents'}`;
+    const count = step.results?.length ?? 0;
+    return `Reading ${count} ${count === 1 ? 'document' : 'documents'}`;
   }
+
 
   return 'Processing';
 };
@@ -63,7 +68,7 @@ const AssistantSteps = ({
   const [isExpanded, setIsExpanded] = useState(
     isLast && status === 'answering' ? true : false,
   );
-  const { researchEnded, loading } = useChat();
+  const { researchEnded, loading, chatMode } = useChat();
 
   useEffect(() => {
     if (researchEnded && isLast) {
@@ -73,7 +78,10 @@ const AssistantSteps = ({
     }
   }, [researchEnded, status]);
 
-  if (!block || block.data.subSteps.length === 0) return null;
+  if (!block || !block.data || !block.data.subSteps || block.data.subSteps.length === 0) return null;
+
+  const subSteps = block.data.subSteps;
+  const headerTitle = chatMode === 'chat' ? 'Web Search' : 'Research Progress';
 
   return (
     <div className="rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 overflow-hidden">
@@ -82,10 +90,14 @@ const AssistantSteps = ({
         className="w-full flex items-center justify-between p-3 hover:bg-light-200 dark:hover:bg-dark-200 transition duration-200"
       >
         <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4 text-black dark:text-white" />
+          {chatMode === 'chat' ? (
+            <Search className="w-4 h-4 text-black dark:text-white" />
+          ) : (
+            <Brain className="w-4 h-4 text-black dark:text-white" />
+          )}
           <span className="text-sm font-medium text-black dark:text-white">
-            Research Progress ({block.data.subSteps.length}{' '}
-            {block.data.subSteps.length === 1 ? 'step' : 'steps'})
+            {headerTitle} ({subSteps.length}{' '}
+            {subSteps.length === 1 ? 'step' : 'steps'})
           </span>
         </div>
         {isExpanded ? (
@@ -105,8 +117,8 @@ const AssistantSteps = ({
             className="border-t border-light-200 dark:border-dark-200"
           >
             <div className="p-3 space-y-2">
-              {block.data.subSteps.map((step, index) => {
-                const isLastStep = index === block.data.subSteps.length - 1;
+              {subSteps.map((step, index) => {
+                const isLastStep = index === subSteps.length - 1;
                 const isStreaming = loading && isLastStep && !researchEnded;
 
                 return (
@@ -123,7 +135,7 @@ const AssistantSteps = ({
                       >
                         {getStepIcon(step)}
                       </div>
-                      {index < block.data.subSteps.length - 1 && (
+                      {index < subSteps.length - 1 && (
                         <div className="w-0.5 flex-1 min-h-[20px] bg-light-200 dark:bg-dark-200 mt-1.5" />
                       )}
                     </div>

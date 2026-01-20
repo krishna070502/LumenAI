@@ -1,4 +1,4 @@
-import { pgTable, text, serial, jsonb, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, text, serial, jsonb, timestamp, integer, vector } from 'drizzle-orm/pg-core';
 import { Block } from '../types';
 import { SearchSources } from '../agents/search/types';
 
@@ -14,6 +14,7 @@ export interface UserPreferencesData {
   autoMediaSearch?: boolean;
   showWeatherWidget?: boolean;
   showNewsWidget?: boolean;
+  memoryEnabled?: boolean; // Controls if RAG/personalization memory is active
 }
 
 export interface UserPersonalizationData {
@@ -50,16 +51,43 @@ export const chats = pgTable('chats', {
   createdAt: timestamp('created_at').defaultNow(),
   sources: jsonb('sources').$type<SearchSources[]>().default([]),
   files: jsonb('files').$type<DBFile[]>().default([]),
+  chatMode: text('chat_mode').$type<'chat' | 'research'>().default('chat'),
 });
 
 // Admin settings - global configuration stored in database
 // Uses a single row with key 'global' for app-wide settings
 export interface AdminSettingsData {
   allowedChatModels?: string[]; // Format: "providerId/modelKey"
+  guestChatLimit?: number; // Max messages for non-logged-in users in Chat mode
+  guestResearchLimit?: number; // Max messages for non-logged-in users in Research mode
+  guestLimitPeriod?: 'session' | 'daily'; // How often the limit resets
 }
 
 export const adminSettings = pgTable('admin_settings', {
   key: text('key').primaryKey().default('global'),
   settings: jsonb('settings').$type<AdminSettingsData>().default({}),
   updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Memories table - stores user-specific long-term facts
+export const memories = pgTable('memories', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  content: text('content').notNull(),
+  embedding: vector('embedding', { dimensions: 1536 }),
+  metadata: jsonb('metadata').default({}),
+  importance: integer('importance').default(1), // 1-5 scale
+  lastAccessedAt: timestamp('last_accessed_at').defaultNow(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Saved articles table - stores user bookmarked articles
+export const savedArticles = pgTable('saved_articles', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  url: text('url').notNull(),
+  title: text('title').notNull(),
+  thumbnail: text('thumbnail'),
+  source: text('source'),
+  savedAt: timestamp('saved_at').defaultNow(),
 });

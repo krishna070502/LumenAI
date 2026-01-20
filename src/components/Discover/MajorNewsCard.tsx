@@ -9,21 +9,19 @@ const MajorNewsCard = ({
   isLeft?: boolean;
 }) => (
   <Link
-    href={`/?q=Summary: ${item.url}`}
+    href={`/article?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}&thumbnail=${encodeURIComponent(item.thumbnail || '')}`}
     className="w-full group flex flex-row items-stretch gap-6 h-60 py-3"
-    target="_blank"
   >
     {isLeft ? (
       <>
         <div className="relative w-80 h-full overflow-hidden rounded-2xl flex-shrink-0">
           <img
             className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-            src={
-              new URL(item.thumbnail).origin +
-              new URL(item.thumbnail).pathname +
-              `?id=${new URL(item.thumbnail).searchParams.get('id')}`
-            }
+            src={item.thumbnail}
             alt={item.title}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/logo.png';
+            }}
           />
         </div>
         <div className="flex flex-col justify-center flex-1 py-4">
@@ -54,12 +52,11 @@ const MajorNewsCard = ({
         <div className="relative w-80 h-full overflow-hidden rounded-2xl flex-shrink-0">
           <img
             className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-            src={
-              new URL(item.thumbnail).origin +
-              new URL(item.thumbnail).pathname +
-              `?id=${new URL(item.thumbnail).searchParams.get('id')}`
-            }
+            src={item.thumbnail}
             alt={item.title}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/logo.png';
+            }}
           />
         </div>
       </>

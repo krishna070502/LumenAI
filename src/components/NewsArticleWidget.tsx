@@ -7,12 +7,13 @@ interface Article {
   thumbnail: string;
 }
 
-const NewsArticleWidget = () => {
-  const [article, setArticle] = useState<Article | null>(null);
-  const [loading, setLoading] = useState(true);
+const NewsArticleWidget = ({ article: initialArticle }: { article?: Article }) => {
+  const [article, setArticle] = useState<Article | null>(initialArticle || null);
+  const [loading, setLoading] = useState(!initialArticle);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (initialArticle) return;
     fetch('/api/discover?mode=preview')
       .then((res) => res.json())
       .then((data) => {
@@ -24,7 +25,7 @@ const NewsArticleWidget = () => {
         setError(true);
         setLoading(false);
       });
-  }, []);
+  }, [initialArticle]);
 
   return (
     <div className="bg-light-secondary dark:bg-dark-secondary rounded-2xl border border-light-200 dark:border-dark-200 shadow-sm shadow-light-200/10 dark:shadow-black/25 flex flex-row items-stretch w-full h-24 min-h-[96px] max-h-[96px] p-0 overflow-hidden">
@@ -40,18 +41,17 @@ const NewsArticleWidget = () => {
         <div className="w-full text-xs text-red-400">Could not load news.</div>
       ) : article ? (
         <a
-          href={`/?q=Summary: ${article.url}`}
+          href={`/article?url=${encodeURIComponent(article.url)}&title=${encodeURIComponent(article.title)}&thumbnail=${encodeURIComponent(article.thumbnail || '')}`}
           className="flex flex-row items-stretch w-full h-full relative overflow-hidden group"
         >
           <div className="relative w-24 min-w-24 max-w-24 h-full overflow-hidden">
             <img
               className="object-cover w-full h-full bg-light-200 dark:bg-dark-200 group-hover:scale-110 transition-transform duration-300"
-              src={
-                new URL(article.thumbnail).origin +
-                new URL(article.thumbnail).pathname +
-                `?id=${new URL(article.thumbnail).searchParams.get('id')}`
-              }
+              src={article.thumbnail}
               alt={article.title}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/logo.png';
+              }}
             />
           </div>
           <div className="flex flex-col justify-center flex-1 px-3 py-2">

@@ -10,6 +10,7 @@ const Chat = () => {
   const { sections, loading, messageAppeared, messages } = useChat();
 
   const [dividerWidth, setDividerWidth] = useState(0);
+  const [dividerLeft, setDividerLeft] = useState(0);
   const dividerRef = useRef<HTMLDivElement | null>(null);
   const messageEnd = useRef<HTMLDivElement | null>(null);
   const lastScrolledRef = useRef<number>(0);
@@ -17,7 +18,9 @@ const Chat = () => {
   useEffect(() => {
     const updateDividerWidth = () => {
       if (dividerRef.current) {
-        setDividerWidth(dividerRef.current.offsetWidth);
+        const rect = dividerRef.current.getBoundingClientRect();
+        setDividerWidth(rect.width);
+        setDividerLeft(rect.left);
       }
     };
 
@@ -47,10 +50,6 @@ const Chat = () => {
     const scroll = () => {
       messageEnd.current?.scrollIntoView({ behavior: 'auto' });
     };
-
-    if (messages.length === 1) {
-      document.title = `${messages[0].query.substring(0, 30)} - Gradia-AIEngine`;
-    }
 
     if (sections.length > lastScrolledRef.current) {
       scroll();
@@ -82,7 +81,7 @@ const Chat = () => {
       {dividerWidth > 0 && (
         <div
           className="fixed z-40 bottom-24 lg:bottom-6"
-          style={{ width: dividerWidth }}
+          style={{ width: dividerWidth, left: dividerLeft }}
         >
           <div
             className="pointer-events-none absolute -bottom-6 left-0 right-0 h-[calc(100%+24px+24px)] dark:hidden"

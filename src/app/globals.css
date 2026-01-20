@@ -13,6 +13,27 @@
   font-display: swap;
 }
 
+/* Subtle gradient background effect */
+.gradient-bg {
+  background-color: #ffffff;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% 30%, rgba(120, 119, 198, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 85% 60%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 90%, rgba(147, 51, 234, 0.06) 0%, transparent 50%);
+  background-attachment: fixed;
+}
+
+:root.dark .gradient-bg,
+html.dark .gradient-bg,
+.dark .gradient-bg {
+  background-color: #0d1117;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% 30%, rgba(120, 119, 198, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 85% 60%, rgba(99, 102, 241, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 90%, rgba(147, 51, 234, 0.1) 0%, transparent 50%);
+  background-attachment: fixed;
+}
+
 @layer base {
   .overflow-hidden-scrollable {
     -ms-overflow-style: none;
@@ -24,7 +45,8 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #e8edf1 transparent; /* light-200 */
+    scrollbar-color: #e8edf1 transparent;
+    /* light-200 */
   }
 
   *::-webkit-scrollbar {
@@ -37,45 +59,53 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background: #e8edf1; /* light-200 */
+    background: #e8edf1;
+    /* light-200 */
     border-radius: 3px;
     transition: background 0.2s ease;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: #d0d7de; /* light-300 */
+    background: #d0d7de;
+    /* light-300 */
   }
 
   @media (prefers-color-scheme: dark) {
     * {
-      scrollbar-color: #21262d transparent; /* dark-200 */
+      scrollbar-color: #21262d transparent;
+      /* dark-200 */
     }
 
     *::-webkit-scrollbar-thumb {
-      background: #21262d; /* dark-200 */
+      background: #21262d;
+      /* dark-200 */
     }
 
     *::-webkit-scrollbar-thumb:hover {
-      background: #30363d; /* dark-300 */
+      background: #30363d;
+      /* dark-300 */
     }
   }
 
   :root.dark *,
   html.dark *,
   body.dark * {
-    scrollbar-color: #21262d transparent; /* dark-200 */
+    scrollbar-color: #21262d transparent;
+    /* dark-200 */
   }
 
   :root.dark *::-webkit-scrollbar-thumb,
   html.dark *::-webkit-scrollbar-thumb,
   body.dark *::-webkit-scrollbar-thumb {
-    background: #21262d; /* dark-200 */
+    background: #21262d;
+    /* dark-200 */
   }
 
   :root.dark *::-webkit-scrollbar-thumb:hover,
   html.dark *::-webkit-scrollbar-thumb:hover,
   body.dark *::-webkit-scrollbar-thumb:hover {
-    background: #30363d; /* dark-300 */
+    background: #30363d;
+    /* dark-300 */
   }
 
   html {
@@ -94,6 +124,7 @@
 }
 
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
+
   select,
   textarea,
   input {

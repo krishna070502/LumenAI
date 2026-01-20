@@ -3,10 +3,37 @@ import { Widget } from '../ChatWindow';
 import Weather from './Weather';
 import Calculation from './Calculation';
 import Stock from './Stock';
+import NewsArticleWidget from '../NewsArticleWidget';
+import Table from './Table';
+import Chart from './Chart';
 
 const Renderer = ({ widgets }: { widgets: Widget[] }) => {
   return widgets.map((widget, index) => {
     switch (widget.widgetType) {
+      case 'table':
+        return (
+          <Table
+            key={index}
+            title={widget.params.title}
+            headers={widget.params.headers}
+            rows={widget.params.rows}
+            footer={widget.params.footer}
+          />
+        );
+      case 'chart':
+        return (
+          <Chart
+            key={index}
+            type={widget.params.type}
+            title={widget.params.title}
+            data={widget.params.data}
+            xAxisKey={widget.params.xAxisKey}
+            yAxisKeys={widget.params.yAxisKeys}
+            colors={widget.params.colors}
+          />
+        );
+      case 'news_article':
+        return <NewsArticleWidget key={index} article={widget.params.article} />;
       case 'weather':
         return (
           <Weather

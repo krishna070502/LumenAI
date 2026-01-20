@@ -2,10 +2,10 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Gradia-AIEngine - AI-Powered Search',
-    short_name: 'Gradia-AIEngine',
+    name: 'LumenAI - Enlighten Yourself',
+    short_name: 'LumenAI',
     description:
-      'Gradia-AIEngine is an AI powered chatbot that is connected to the internet.',
+      'LumenAI is an AI-powered assistant that helps you discover, learn, and explore with intelligent search and insights.',
     start_url: '/',
     display: 'standalone',
     background_color: '#0a0a0a',
@@ -34,20 +34,15 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     icons: [
       {
-        src: '/icon-50.png',
-        sizes: '50x50',
-        type: 'image/png' as const,
-      },
-      {
-        src: '/icon-100.png',
-        sizes: '100x100',
-        type: 'image/png',
-      },
-      {
-        src: '/icon.png',
-        sizes: '440x440',
+        src: '/logo-upscaled.png',
+        sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
+      },
+      {
+        src: '/logo-upscaled.png',
+        sizes: '192x192',
+        type: 'image/png',
       },
     ],
   };

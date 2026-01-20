@@ -16,10 +16,12 @@ export async function GET() {
             .limit(1);
 
         const allowedModels = settings[0]?.settings?.allowedChatModels || [];
+        console.log(`[allowed-models] allowedChatModels from DB: ${JSON.stringify(allowedModels)}`);
 
         // Use ModelRegistry to get dynamically-fetched providers with model lists
         const registry = new ModelRegistry();
         const activeProviders = await registry.getActiveProviders();
+        console.log(`[allowed-models] Active providers: ${activeProviders.length}, names: ${activeProviders.map(p => p.name).join(', ')}`);
 
         // Build list of allowed models with details
         const models: Array<{
@@ -31,14 +33,32 @@ export async function GET() {
 
         for (const provider of activeProviders) {
             // Skip providers with error models
-            if (provider.chatModels.some((m) => m.key === 'error')) continue;
+            if (provider.chatModels.some((m) => m.key === 'error')) {
+                console.log(`[allowed-models] Skipping ${provider.name} due to error model`);
+                continue;
+            }
+
+            console.log(`[allowed-models] Provider ${provider.name} has ${provider.chatModels.length} chat models`);
 
             for (const model of provider.chatModels || []) {
                 const modelId = `${provider.id}/${model.key}`;
 
+                // Extract just the model key from allowed models for flexible matching
+                // Allowed models format can be "providerId/modelKey" - we match on modelKey only
+                // This handles provider ID changes across server restarts
+                const allowedModelKeys = allowedModels.map((m: string) => {
+                    const parts = m.split('/');
+                    // Return the last part (model key) or the full string if no slash
+                    return parts.length > 1 ? parts.slice(1).join('/') : m;
+                });
+
                 // If no allowed models configured, allow all
-                // If allowed models configured, only include those
-                if (allowedModels.length === 0 || allowedModels.includes(modelId)) {
+                // If allowed models configured, match by model key
+                const isAllowed = allowedModels.length === 0 ||
+                    allowedModels.includes(modelId) ||
+                    allowedModelKeys.includes(model.key);
+
+                if (isAllowed) {
                     models.push({
                         providerId: provider.id,
                         providerName: provider.name,
@@ -49,6 +69,7 @@ export async function GET() {
             }
         }
 
+        console.log(`[allowed-models] Returning ${models.length} models`);
         return NextResponse.json({ models, allowedModels });
     } catch (error) {
         console.error('Error fetching allowed models:', error);

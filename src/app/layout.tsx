@@ -19,9 +19,14 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: 'Gradia-AIEngine - AI-Powered Search',
+  title: 'LumenAI - Enlighten Yourself',
   description:
-    'Gradia-AIEngine is an AI powered chatbot that is connected to the internet.',
+    'LumenAI is an AI-powered assistant that helps you discover, learn, and explore with intelligent search and insights.',
+  icons: {
+    icon: '/logo-upscaled.png',
+    shortcut: '/logo-upscaled.png',
+    apple: '/logo-upscaled.png',
+  },
 };
 
 export default function RootLayout({
@@ -33,7 +38,7 @@ export default function RootLayout({
 
   return (
     <html className="h-full" lang="en" suppressHydrationWarning>
-      <body className={cn('h-full antialiased', montserrat.className)} suppressHydrationWarning>
+      <body className={cn('h-full antialiased gradient-bg', montserrat.className)} suppressHydrationWarning>
         <ThemeProvider>
           {setupComplete ? (
             <ChatProvider>

@@ -3,19 +3,17 @@ import Link from 'next/link';
 
 const SmallNewsCard = ({ item }: { item: Discover }) => (
   <Link
-    href={`/?q=Summary: ${item.url}`}
+    href={`/article?url=${encodeURIComponent(item.url)}&title=${encodeURIComponent(item.title)}&thumbnail=${encodeURIComponent(item.thumbnail || '')}`}
     className="rounded-3xl overflow-hidden bg-light-secondary dark:bg-dark-secondary shadow-sm shadow-light-200/10 dark:shadow-black/25 group flex flex-col"
-    target="_blank"
   >
     <div className="relative aspect-video overflow-hidden">
       <img
         className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-        src={
-          new URL(item.thumbnail).origin +
-          new URL(item.thumbnail).pathname +
-          `?id=${new URL(item.thumbnail).searchParams.get('id')}`
-        }
+        src={item.thumbnail}
         alt={item.title}
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = '/logo.png';
+        }}
       />
     </div>
     <div className="p-4">

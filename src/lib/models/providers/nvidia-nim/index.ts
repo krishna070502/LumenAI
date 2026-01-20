@@ -4,7 +4,7 @@ import BaseEmbedding from '../../base/embedding';
 import BaseModelProvider from '../../base/provider';
 import BaseLLM from '../../base/llm';
 import OpenAILLM from '../openai/openaiLLM';
-import OpenAIEmbedding from '../openai/openaiEmbedding';
+import NvidiaNIMEmbedding from './nvidiaNIMEmbedding';
 
 interface NvidiaNIMConfig {
     apiKey: string;
@@ -68,12 +68,16 @@ const defaultChatModels: Model[] = [
 
 const defaultEmbeddingModels: Model[] = [
     {
-        name: 'NV-Embed-QA',
+        name: 'NV-EmbedQA E5 V5 (1024 d)',
+        key: 'nvidia/nv-embedqa-e5-v5',
+    },
+    {
+        name: 'NV-Embed-QA (Standard)',
         key: 'nvidia/nv-embed-qa',
     },
     {
-        name: 'NV-Embed-2',
-        key: 'nvidia/nv-embed-v2',
+        name: 'Llama 3.2 NV-EmbedQA 1B V2 (512 d)',
+        key: 'nvidia/llama-3.2-nv-embedqa-1b-v2',
     },
 ];
 
@@ -156,7 +160,7 @@ class NvidiaNIMProvider extends BaseModelProvider<NvidiaNIMConfig> {
             );
         }
 
-        return new OpenAIEmbedding({
+        return new NvidiaNIMEmbedding({
             apiKey: this.config.apiKey,
             model: key,
             baseURL: this.config.baseURL,

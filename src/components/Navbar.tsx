@@ -1,4 +1,4 @@
-import { Clock, Edit, Share, Trash, FileText, FileDown } from 'lucide-react';
+import { Clock, Edit, Share, Trash, FileText, FileDown, Sparkles, Bot } from 'lucide-react';
 import { Message } from './ChatWindow';
 import { useEffect, useState, Fragment } from 'react';
 import { formatTimeDifference } from '@/lib/utils';
@@ -197,26 +197,9 @@ const exportAsPDF = (sections: Section[], title: string) => {
 };
 
 const Navbar = () => {
-  const [title, setTitle] = useState<string>('');
   const [timeAgo, setTimeAgo] = useState<string>('');
 
-  const { sections, chatId } = useChat();
-
-  useEffect(() => {
-    if (sections.length > 0 && sections[0].message) {
-      const newTitle =
-        sections[0].message.query.length > 30
-          ? `${sections[0].message.query.substring(0, 30).trim()}...`
-          : sections[0].message.query || 'New Conversation';
-
-      setTitle(newTitle);
-      const newTimeAgo = formatTimeDifference(
-        new Date(),
-        sections[0].message.createdAt,
-      );
-      setTimeAgo(newTimeAgo);
-    }
-  }, [sections]);
+  const { sections, chatId, chatModelProvider, chatMode, title } = useChat();
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -250,10 +233,11 @@ const Navbar = () => {
             </div>
           </div>
 
-          <div className="flex-1 mx-4 min-w-0">
-            <h1 className="text-center text-sm font-medium text-black/80 dark:text-white/90 truncate">
+          <div className="flex-1 mx-4 min-w-0 flex flex-col items-center">
+            <h1 className="text-center text-sm font-semibold text-black/90 dark:text-white/90 truncate w-full">
               {title || 'New Conversation'}
             </h1>
+
           </div>
 
           <div className="flex items-center gap-2 min-w-0">

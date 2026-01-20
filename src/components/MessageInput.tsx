@@ -1,9 +1,10 @@
 import { cn } from '@/lib/utils';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import TextareaAutosize from 'react-textarea-autosize';
 import AttachSmall from './MessageInputActions/AttachSmall';
 import { useChat } from '@/lib/hooks/useChat';
+import ChatModeToggle from './MessageInputActions/ChatModeToggle';
 
 const MessageInput = () => {
   const { loading, sendMessage } = useChat();
@@ -48,14 +49,19 @@ const MessageInput = () => {
   return (
     <form
       onSubmit={(e) => {
-        if (loading) return;
         e.preventDefault();
+        if (loading || !message.trim()) return;
         sendMessage(message);
         setMessage('');
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !e.shiftKey && !loading) {
+        if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
+          if (loading || !message.trim()) {
+            console.log('[MessageInput] Enter blocked - loading:', loading, 'message empty:', !message.trim());
+            return;
+          }
+          console.log('[MessageInput] Sending message via Enter');
           sendMessage(message);
           setMessage('');
         }
@@ -77,21 +83,59 @@ const MessageInput = () => {
         placeholder="Ask a follow-up"
       />
       {mode === 'single' && (
-        <button
-          disabled={message.trim().length === 0 || loading}
-          className="bg-[#24A0ED] text-white disabled:text-black/50 dark:disabled:text-white/50 hover:bg-opacity-85 transition duration-100 disabled:bg-[#e0e0dc79] dark:disabled:bg-[#ececec21] rounded-full p-2"
-        >
-          <ArrowUp className="bg-background" size={17} />
-        </button>
+        <div className="flex flex-row items-center space-x-2">
+          <ChatModeToggle />
+          <button
+            disabled={message.trim().length === 0 || loading}
+            className={cn(
+              "relative group rounded-full p-2.5 transition-all duration-300",
+              message.trim().length > 0 && !loading
+                ? "bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 hover:from-purple-600 hover:via-purple-700 hover:to-indigo-700 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/40 active:scale-95"
+                : "bg-light-100 dark:bg-dark-100 border border-light-200 dark:border-dark-200"
+            )}
+          >
+            <Send
+              size={16}
+              className={cn(
+                "transition-all duration-300",
+                message.trim().length > 0 && !loading
+                  ? "text-white"
+                  : "text-black/30 dark:text-white/30"
+              )}
+            />
+            {message.trim().length > 0 && !loading && (
+              <span className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300" />
+            )}
+          </button>
+        </div>
       )}
       {mode === 'multi' && (
         <div className="flex flex-row items-center justify-between w-full pt-2">
-          <AttachSmall />
+          <div className="flex flex-row items-center space-x-2">
+            <AttachSmall />
+            <ChatModeToggle />
+          </div>
           <button
             disabled={message.trim().length === 0 || loading}
-            className="bg-[#24A0ED] text-white disabled:text-black/50 dark:disabled:text-white/50 hover:bg-opacity-85 transition duration-100 disabled:bg-[#e0e0dc79] dark:disabled:bg-[#ececec21] rounded-full p-2"
+            className={cn(
+              "relative group rounded-full p-2.5 transition-all duration-300",
+              message.trim().length > 0 && !loading
+                ? "bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 hover:from-purple-600 hover:via-purple-700 hover:to-indigo-700 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/40 active:scale-95"
+                : "bg-light-100 dark:bg-dark-100 border border-light-200 dark:border-dark-200"
+            )}
           >
-            <ArrowUp className="bg-background" size={17} />
+            <Send
+              size={16}
+              className={cn(
+                "transition-all duration-300",
+                message.trim().length > 0 && !loading
+                  ? "text-white"
+                  : "text-black/30 dark:text-white/30"
+              )}
+            />
+            {message.trim().length > 0 && !loading && (
+              <span className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300" />
+            )}
           </button>
         </div>
       )}

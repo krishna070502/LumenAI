@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { generateText } from 'ai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import ModelRegistry from '@/lib/models/registry';
 import { ModelWithProvider } from '@/lib/models/types';
 import SearchAgent from '@/lib/agents/search';
@@ -10,6 +12,12 @@ import { eq } from 'drizzle-orm';
 import { chats } from '@/lib/db/schema';
 import UploadManager from '@/lib/uploads/manager';
 import { getCurrentUser } from '@/lib/auth';
+
+const nim = createOpenAICompatible({
+  name: 'nvidia-nim',
+  baseURL: process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+  headers: { Authorization: `Bearer ${process.env.NVIDIA_NIM_API_KEY}` },
+});
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,6 +83,7 @@ const ensureChatExists = async (input: {
   sources: SearchSources[];
   query: string;
   fileIds: string[];
+  chatMode?: 'chat' | 'research';
 }) => {
   try {
     const exists = await db.query.chats
@@ -89,6 +98,7 @@ const ensureChatExists = async (input: {
         userId: input.userId,
         title: input.query,
         sources: input.sources,
+        chatMode: input.chatMode || 'chat',
         files: input.fileIds.map((id) => {
           return {
             fileId: id,
@@ -99,6 +109,27 @@ const ensureChatExists = async (input: {
     }
   } catch (err) {
     console.error('Failed to check/save chat:', err);
+  }
+};
+
+const generateChatTitle = async (query: string, response: string, chatId: string): Promise<void> => {
+  try {
+    const result = await generateText({
+      model: nim.chatModel('meta/llama-3.1-405b-instruct'),
+      system: 'You are a helpful assistant that generates concise chat titles. Generate a short, descriptive title (3-6 words) that summarizes the conversation topic. Only output the title, nothing else.',
+      messages: [
+        { role: 'user', content: query },
+        { role: 'assistant', content: response.slice(0, 500) },
+        { role: 'user', content: 'Generate a concise title for this conversation.' }
+      ],
+    });
+    const title = result.text.trim().replace(/^["']|["']$/g, '').slice(0, 100);
+    if (title) {
+      await db.update(chats).set({ title }).where(eq(chats.id, chatId)).execute();
+      console.log('[research] Generated title:', title);
+    }
+  } catch (err) {
+    console.error('[research] Failed to generate title:', err);
   }
 };
 
@@ -207,6 +238,15 @@ export const POST = async (req: Request) => {
         );
         writer.close();
         session.removeAllListeners();
+
+        // Generate AI title for new conversations (no history)
+        if (history.length === 0) {
+          const textBlock = session.getAllBlocks().find((b: any) => b.type === 'text');
+          const responseText = typeof textBlock?.data === 'string' ? textBlock.data : '';
+          if (responseText) {
+            generateChatTitle(message.content, responseText, body.message.chatId);
+          }
+        }
       } else if (event === 'error') {
         writer.write(
           encoder.encode(
@@ -243,6 +283,7 @@ export const POST = async (req: Request) => {
       sources: body.sources as SearchSources[],
       fileIds: body.files,
       query: body.message.content,
+      chatMode: 'research',
     });
 
     req.signal.addEventListener('abort', () => {

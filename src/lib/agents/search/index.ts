@@ -4,6 +4,8 @@ import { classify } from './classifier';
 import Researcher from './researcher';
 import { getWriterPrompt } from '@/lib/prompts/search/writer';
 import { WidgetExecutor } from './widgets';
+import ModelRegistry from '@/lib/models/registry';
+import { MemoryManager } from '@/lib/memory/manager';
 import db from '@/lib/db';
 import { chats, messages } from '@/lib/db/schema';
 import { and, eq, gt } from 'drizzle-orm';
@@ -58,6 +60,20 @@ class SearchAgent {
       query: input.followUp,
       llm: input.config.llm,
     });
+
+    // Memory Manager initialization for extraction later
+    let memoryManager: MemoryManager | null = null;
+    try {
+      const registry = new ModelRegistry();
+      const providers = await registry.getActiveProviders();
+      const embeddingProvider = providers.find((p) => p.embeddingModels.length > 0);
+      if (embeddingProvider) {
+        const embeddingModel = await registry.loadEmbeddingModel(embeddingProvider.id, embeddingProvider.embeddingModels[0].key);
+        memoryManager = new MemoryManager(embeddingModel);
+      }
+    } catch (err) {
+      console.error('Memory manager initialization failed in SearchAgent:', err);
+    }
 
     const widgetPromise = WidgetExecutor.executeAll({
       classification,
@@ -118,7 +134,7 @@ class SearchAgent {
     const writerPrompt = getWriterPrompt(
       finalContextWithWidgets,
       input.config.systemInstructions,
-      input.config.mode,
+      input.config.mode
     );
     const answerStream = input.config.llm.streamText({
       messages: [
@@ -181,6 +197,19 @@ class SearchAgent {
         ),
       )
       .execute();
+
+    // Memory Extraction
+    if (memoryManager && (input.chatHistory.length / 2) % 5 === 0) {
+      MemoryManager.extractMemories(input.config.llm, [
+        ...input.chatHistory,
+        { role: 'user', content: input.followUp },
+        { role: 'assistant', content: session.getAllBlocks().filter(b => b.type === 'text').map((b: any) => b.data).join('\n') }
+      ] as any).then(async (extracted) => {
+        for (const mem of extracted) {
+          await memoryManager?.saveMemory(input.userId, mem);
+        }
+      }).catch(err => console.error('Memory extraction failed in SearchAgent:', err));
+    }
   }
 }
 

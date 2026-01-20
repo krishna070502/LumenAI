@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import crypto from 'crypto';
+
 import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { getSuggestions } from '../actions';
@@ -37,6 +37,7 @@ type ChatContext = {
   sources: string[];
   chatId: string | undefined;
   optimizationMode: string;
+  chatMode: 'chat' | 'research';
   isMessagesLoaded: boolean;
   loading: boolean;
   notFound: boolean;
@@ -46,8 +47,10 @@ type ChatContext = {
   chatModelProvider: ChatModelProvider;
   embeddingModelProvider: EmbeddingModelProvider;
   researchEnded: boolean;
+  title: string;
   setResearchEnded: (ended: boolean) => void;
   setOptimizationMode: (mode: string) => void;
+  setChatMode: (mode: 'chat' | 'research') => void;
   setSources: (sources: string[]) => void;
   setFiles: (files: File[]) => void;
   setFileIds: (fileIds: string[]) => void;
@@ -182,6 +185,8 @@ const loadMessages = async (
   setNotFound: (notFound: boolean) => void,
   setFiles: (files: File[]) => void,
   setFileIds: (fileIds: string[]) => void,
+  setTitle: (title: string) => void,
+  setChatMode: (mode: 'chat' | 'research') => void,
 ) => {
   const res = await fetch(`/api/chats/${chatId}`, {
     method: 'GET',
@@ -221,7 +226,14 @@ const loadMessages = async (
   console.debug(new Date(), 'app:messages_loaded');
 
   if (messages.length > 0) {
-    document.title = messages[0].query;
+    // Use the chat's title from the database (which may be AI-generated)
+    const newTitle = data.chat?.title || messages[0].query;
+    document.title = newTitle;
+    setTitle(newTitle);
+  }
+
+  if (data.chat?.chatMode) {
+    setChatMode(data.chat.chatMode);
   }
 
   const files = data.chat.files.map((file: any) => {
@@ -255,15 +267,18 @@ export const chatContext = createContext<ChatContext>({
   sections: [],
   notFound: false,
   optimizationMode: '',
+  chatMode: 'chat',
   chatModelProvider: { key: '', providerId: '' },
   embeddingModelProvider: { key: '', providerId: '' },
   researchEnded: false,
+  title: '',
   rewrite: () => { },
   sendMessage: async () => { },
   setFileIds: () => { },
   setFiles: () => { },
   setSources: () => { },
   setOptimizationMode: () => { },
+  setChatMode: () => { },
   setChatModelProvider: () => { },
   setEmbeddingModelProvider: () => { },
   setResearchEnded: () => { },
@@ -289,8 +304,11 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [fileIds, setFileIds] = useState<string[]>([]);
 
-  const [sources, setSources] = useState<string[]>(['web']);
+  const [sources, setSources] = useState<string[]>([]);
   const [optimizationMode, setOptimizationMode] = useState('speed');
+  const [chatMode, setChatMode] = useState<'chat' | 'research'>('chat');
+
+  const [title, setTitle] = useState('');
 
   const [isMessagesLoaded, setIsMessagesLoaded] = useState(false);
 
@@ -313,7 +331,24 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [hasError, setHasError] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
+  // Update default sources based on chat mode
+  // Research mode: always enable web search by default
+  // Chat mode: no search by default (user can enable)
+  useEffect(() => {
+    if (chatMode === 'research') {
+      setSources(['web']);
+    } else {
+      setSources([]);
+    }
+  }, [chatMode]);
+
   const messagesRef = useRef<Message[]>([]);
+  const handledMessageEndRef = useRef<Set<string>>(new Set());
+
+  // Keep messagesRef in sync with state for access in stream handlers
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const sections = useMemo<Section[]>(() => {
     return (messages || []).map((msg) => {
@@ -368,94 +403,45 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                     }
 
                     const source = sources[number - 1];
-                    const url = source?.metadata?.url;
 
-                    if (url) {
-                      return `<citation href="${url}">${numStr}</citation>`;
-                    } else {
-                      return ``;
+                    if (source) {
+                      return `<a href="${source.metadata.url}" target="_blank" class="no-underline"><span class="citation-link">${number}</span></a>`;
                     }
+
+                    return `[${number}]`;
                   })
                   .join('');
 
                 return linksHtml;
               },
             );
-            speechMessage += block.data.replace(regex, '');
-          } else {
-            processedText = processedText.replace(regex, '');
-            speechMessage += block.data.replace(regex, '');
           }
 
           textBlocks.push(processedText);
-        } else if (block.type === 'suggestion') {
+          speechMessage += block.data.replace(regex, '');
+        }
+
+        if (block.type === 'suggestion') {
           suggestions = block.data;
         }
       });
 
       return {
         message: msg,
+        widgets: widgetBlocks,
         parsedTextBlocks: textBlocks,
         speechMessage,
         thinkingEnded,
         suggestions,
-        widgets: widgetBlocks,
       };
     });
   }, [messages]);
 
-  const isReconnectingRef = useRef(false);
-  const handledMessageEndRef = useRef<Set<string>>(new Set());
-
   const checkReconnect = async () => {
-    if (isReconnectingRef.current) return;
-
-    if (messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-
-      if (lastMsg.status === 'answering') {
-        setLoading(true);
-        setResearchEnded(false);
-        setMessageAppeared(false);
-
-        isReconnectingRef.current = true;
-
-        const res = await fetch(`/api/reconnect/${lastMsg.backendId}`, {
-          method: 'POST',
-        });
-
-        if (!res.body) throw new Error('No response body');
-
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder('utf-8');
-
-        let partialChunk = '';
-
-        const messageHandler = getMessageHandler(lastMsg);
-
-        try {
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            partialChunk += decoder.decode(value, { stream: true });
-
-            try {
-              const messages = partialChunk.split('\n');
-              for (const msg of messages) {
-                if (!msg.trim()) continue;
-                const json = JSON.parse(msg);
-                messageHandler(json);
-              }
-              partialChunk = '';
-            } catch (error) {
-              console.warn('Incomplete JSON, waiting for next chunk...');
-            }
-          }
-        } finally {
-          isReconnectingRef.current = false;
-        }
-      }
+    const lastMsg = messagesRef.current[messagesRef.current.length - 1];
+    if (lastMsg && lastMsg.status === 'answering') {
+      const handler = getMessageHandler(lastMsg);
+      // Logic for reconnection could go here
     }
   };
 
@@ -498,18 +484,16 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setNotFound,
         setFiles,
         setFileIds,
+        setTitle,
+        setChatMode,
       );
     } else if (!chatId) {
       setNewChatCreated(true);
       setIsMessagesLoaded(true);
-      setChatId(crypto.randomBytes(20).toString('hex'));
+      setChatId(globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 40));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, isMessagesLoaded, newChatCreated, messages.length]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
 
   useEffect(() => {
     if (isMessagesLoaded && isConfigReady) {
@@ -548,6 +532,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
   const getMessageHandler = (message: Message) => {
     const messageId = message.messageId;
+    let accumulatedText = '';
 
     return async (data: any) => {
       if (data.type === 'error') {
@@ -563,6 +548,13 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
+      if (data.type === 'mediaSearch') {
+        setTimeout(() => {
+          document.getElementById(`search-${data.type === 'images' ? 'images' : 'videos'}-${messageId}`)?.click();
+        }, 100);
+        return;
+      }
+
       if (data.type === 'researchComplete') {
         setResearchEnded(true);
         if (
@@ -575,6 +567,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (data.type === 'block') {
+        if (data.block.type === 'text') {
+          accumulatedText = data.block.data;
+        }
+
         setMessages((prev) =>
           prev.map((msg) => {
             if (msg.messageId === messageId) {
@@ -617,6 +613,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 if (block.id === data.blockId) {
                   const updatedBlock = { ...block };
                   applyPatch(updatedBlock, data.patch);
+                  if (updatedBlock.type === 'text') {
+                    accumulatedText = updatedBlock.data;
+                  }
                   return updatedBlock;
                 }
                 return block;
@@ -635,18 +634,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
         handledMessageEndRef.current.add(messageId);
 
-        const currentMsg = messagesRef.current.find(
-          (msg) => msg.messageId === messageId,
-        );
-
         const newHistory: [string, string][] = [
           ...chatHistory.current,
           ['human', message.query],
-          [
-            'assistant',
-            currentMsg?.responseBlocks.find((b) => b.type === 'text')?.data ||
-            '',
-          ],
+          ['assistant', accumulatedText],
         ];
 
         chatHistory.current = newHistory;
@@ -660,8 +651,26 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         );
 
         setLoading(false);
+        setResearchEnded(true);
+
+        // Fetch updated title after first message (AI title is generated on server)
+        if (chatHistory.current.length === 2) {  // First human + assistant pair
+          setTimeout(async () => {
+            try {
+              const res = await fetch(`/api/chats/${chatId}/title`);
+              if (res.ok) {
+                const { title } = await res.json();
+                if (title) {
+                  document.title = title;
+                  setTitle(title);
+                }
+              }
+            } catch (e) { /* ignore */ }
+          }, 3000); // Wait 3s for title generation
+        }
 
         const lastMsg = messagesRef.current[messagesRef.current.length - 1];
+        if (!lastMsg) return;
 
         const autoMediaSearch = getAutoMediaSearch();
 
@@ -678,7 +687,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         // Check if there are sources and no suggestions
-
+        const currentMsg = messagesRef.current.find(m => m.messageId === messageId);
         const hasSourceBlocks = currentMsg?.responseBlocks.some(
           (block) => block.type === 'source' && block.data.length > 0,
         );
@@ -689,7 +698,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         if (hasSourceBlocks && !hasSuggestions) {
           const suggestions = await getSuggestions(newHistory);
           const suggestionBlock: Block = {
-            id: crypto.randomBytes(7).toString('hex'),
+            id: globalThis.crypto.randomUUID().slice(0, 14),
             type: 'suggestion',
             data: suggestions,
           };
@@ -724,8 +733,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       window.history.replaceState(null, '', `/c/${chatId}`);
     }
 
-    messageId = messageId ?? crypto.randomBytes(7).toString('hex');
-    const backendId = crypto.randomBytes(20).toString('hex');
+    messageId = messageId ?? globalThis.crypto.randomUUID().slice(0, 14);
+    const backendId = globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 40);
 
     const newMessage: Message = {
       messageId,
@@ -741,7 +750,13 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
     const messageIndex = messages.findIndex((m) => m.messageId === messageId);
 
-    const res = await fetch('/api/chat', {
+    // Debug: Log history being sent
+    console.log(`[useChat] Sending message with ${chatHistory.current.length} history entries`);
+
+    // Use AI SDK route for Chat Mode, original route for Research Mode
+    const apiEndpoint = chatMode === 'chat' ? '/api/ai-chat-v2' : '/api/chat';
+
+    const res = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -754,8 +769,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           content: message,
         },
         chatId: chatId!,
+        messageId: messageId,
         files: fileIds,
         sources: sources,
+        chatMode: chatMode,
         optimizationMode: optimizationMode,
         history: rewrite
           ? chatHistory.current.slice(
@@ -772,6 +789,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           providerId: embeddingModelProvider.providerId,
         },
         systemInstructions: localStorage.getItem('systemInstructions'),
+        memoryEnabled: localStorage.getItem('memoryEnabled') !== 'false',
       }),
     });
 
@@ -780,28 +798,52 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     const reader = res.body?.getReader();
     const decoder = new TextDecoder('utf-8');
 
+    // Unified handler for both modes - expects newline-separated JSON blocks
     let partialChunk = '';
-
     const messageHandler = getMessageHandler(newMessage);
 
     while (true) {
-      const { value, done } = await reader.read();
+      const { done, value } = await reader.read();
       if (done) break;
 
       partialChunk += decoder.decode(value, { stream: true });
+      const lines = partialChunk.split('\n');
+      partialChunk = lines.pop() || '';
 
-      try {
-        const messages = partialChunk.split('\n');
-        for (const msg of messages) {
-          if (!msg.trim()) continue;
-          const json = JSON.parse(msg);
-          messageHandler(json);
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const data = JSON.parse(line);
+          await messageHandler(data);
+        } catch (e) {
+          console.error('Failed to parse stream line:', line, e);
         }
-        partialChunk = '';
-      } catch (error) {
-        console.warn('Incomplete JSON, waiting for next chunk...');
       }
     }
+
+    // Process the final chunk if it contains data
+    if (partialChunk.trim()) {
+      try {
+        const data = JSON.parse(partialChunk);
+        await messageHandler(data);
+      } catch (e) {
+        console.error('Failed to parse final stream chunk:', partialChunk, e);
+      }
+    }
+
+    // Fallback: Ensure loading is always cleared when stream ends
+    // This handles cases where messageEnd event might be missed
+    setLoading(false);
+    setResearchEnded(true);
+
+    // Also ensure the message status is updated to completed
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.messageId === newMessage.messageId && msg.status === 'answering'
+          ? { ...msg, status: 'completed' as const }
+          : msg,
+      ),
+    );
   };
 
   return (
@@ -814,25 +856,28 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         fileIds,
         sources,
         chatId,
-        hasError,
-        isMessagesLoaded,
-        isReady,
-        loading,
-        messageAppeared,
-        notFound,
         optimizationMode,
-        setFileIds,
-        setFiles,
-        setSources,
-        setOptimizationMode,
-        rewrite,
-        sendMessage,
-        setChatModelProvider,
+        chatMode,
+        isMessagesLoaded,
+        loading,
+        notFound,
+        messageAppeared,
+        isReady,
+        hasError,
         chatModelProvider,
         embeddingModelProvider,
-        setEmbeddingModelProvider,
         researchEnded,
+        title,
         setResearchEnded,
+        setOptimizationMode,
+        setChatMode,
+        setSources,
+        setFiles,
+        setFileIds,
+        sendMessage,
+        rewrite,
+        setChatModelProvider,
+        setEmbeddingModelProvider,
       }}
     >
       {children}
@@ -841,6 +886,9 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useChat = () => {
-  const ctx = useContext(chatContext);
-  return ctx;
+  const context = useContext(chatContext);
+  if (!context) {
+    throw new Error('useChat must be used within a ChatProvider');
+  }
+  return context;
 };
