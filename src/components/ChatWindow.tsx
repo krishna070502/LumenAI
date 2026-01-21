@@ -55,7 +55,7 @@ const ChatWindow = () => {
     notFound ? (
       <NextError statusCode={404} />
     ) : (
-      <div className="overflow-x-hidden">
+      <div className="h-full flex flex-col overflow-x-hidden">
         {messages.length > 0 ? (
           <>
             <Navbar />

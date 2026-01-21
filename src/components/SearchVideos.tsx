@@ -47,49 +47,28 @@ const Searchvideos = ({
           id={`search-videos-${messageId}`}
           onClick={async () => {
             setLoading(true);
-
-            const chatModelProvider = localStorage.getItem(
-              'chatModelProviderId',
-            );
+            const chatModelProvider = localStorage.getItem('chatModelProviderId');
             const chatModel = localStorage.getItem('chatModelKey');
-
             const res = await fetch(`/api/videos`, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                query: query,
-                chatHistory: chatHistory,
-                chatModel: {
-                  providerId: chatModelProvider,
-                  key: chatModel,
-                },
-              }),
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query, chatHistory, chatModel: { providerId: chatModelProvider, key: chatModel } }),
             });
-
             const data = await res.json();
-
             const videos = data.videos ?? [];
             setVideos(videos);
-            setSlides(
-              videos.map((video: Video) => {
-                return {
-                  type: 'video-slide',
-                  iframe_src: video.iframe_src,
-                  src: video.img_src,
-                };
-              }),
-            );
+            setSlides(videos.map((vid: Video) => ({ type: 'video-slide', iframe_src: vid.iframe_src, src: vid.img_src })));
             setLoading(false);
           }}
-          className="border border-dashed border-light-200 dark:border-dark-200 hover:bg-light-200 dark:hover:bg-dark-200 active:scale-95 duration-200 transition px-4 py-2 flex flex-row items-center justify-between rounded-lg dark:text-white text-sm w-full"
+          className="bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] active:scale-95 duration-200 transition px-4 py-3.5 flex flex-row items-center justify-between rounded-xl dark:text-white/80 text-sm w-full group"
         >
-          <div className="flex flex-row items-center space-x-2">
-            <VideoIcon size={17} />
-            <p>Search videos</p>
+          <div className="flex flex-row items-center space-x-3">
+            <div className="p-1 rounded-md bg-white/5 border border-white/5">
+              <VideoIcon size={16} className="text-white/40 group-hover:text-white transition-colors" />
+            </div>
+            <p className="font-medium tracking-tight">Search videos</p>
           </div>
-          <PlusIcon className="text-[#24A0ED]" size={17} />
+          <PlusIcon className="text-white/20 group-hover:text-[#24A0ED] transition-colors" size={16} />
         </button>
       )}
       {loading && (
@@ -107,53 +86,53 @@ const Searchvideos = ({
           <div className="grid grid-cols-2 gap-2">
             {videos.length > 4
               ? videos.slice(0, 3).map((video, i) => (
-                  <div
-                    onClick={() => {
-                      setOpen(true);
-                      setSlides([
-                        slides[i],
-                        ...slides.slice(0, i),
-                        ...slides.slice(i + 1),
-                      ]);
-                    }}
-                    className="relative transition duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer"
-                    key={i}
-                  >
-                    <img
-                      src={video.img_src}
-                      alt={video.title}
-                      className="relative h-full w-full aspect-video object-cover rounded-lg"
-                    />
-                    <div className="absolute bg-white/70 dark:bg-black/70 text-black/70 dark:text-white/70 px-2 py-1 flex flex-row items-center space-x-1 bottom-1 right-1 rounded-md">
-                      <PlayCircle size={15} />
-                      <p className="text-xs">Video</p>
-                    </div>
+                <div
+                  onClick={() => {
+                    setOpen(true);
+                    setSlides([
+                      slides[i],
+                      ...slides.slice(0, i),
+                      ...slides.slice(i + 1),
+                    ]);
+                  }}
+                  className="relative transition duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer"
+                  key={i}
+                >
+                  <img
+                    src={video.img_src}
+                    alt={video.title}
+                    className="relative h-full w-full aspect-video object-cover rounded-lg"
+                  />
+                  <div className="absolute bg-white/70 dark:bg-black/70 text-black/70 dark:text-white/70 px-2 py-1 flex flex-row items-center space-x-1 bottom-1 right-1 rounded-md">
+                    <PlayCircle size={15} />
+                    <p className="text-xs">Video</p>
                   </div>
-                ))
+                </div>
+              ))
               : videos.map((video, i) => (
-                  <div
-                    onClick={() => {
-                      setOpen(true);
-                      setSlides([
-                        slides[i],
-                        ...slides.slice(0, i),
-                        ...slides.slice(i + 1),
-                      ]);
-                    }}
-                    className="relative transition duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer"
-                    key={i}
-                  >
-                    <img
-                      src={video.img_src}
-                      alt={video.title}
-                      className="relative h-full w-full aspect-video object-cover rounded-lg"
-                    />
-                    <div className="absolute bg-white/70 dark:bg-black/70 text-black/70 dark:text-white/70 px-2 py-1 flex flex-row items-center space-x-1 bottom-1 right-1 rounded-md">
-                      <PlayCircle size={15} />
-                      <p className="text-xs">Video</p>
-                    </div>
+                <div
+                  onClick={() => {
+                    setOpen(true);
+                    setSlides([
+                      slides[i],
+                      ...slides.slice(0, i),
+                      ...slides.slice(i + 1),
+                    ]);
+                  }}
+                  className="relative transition duration-200 active:scale-95 hover:scale-[1.02] cursor-pointer"
+                  key={i}
+                >
+                  <img
+                    src={video.img_src}
+                    alt={video.title}
+                    className="relative h-full w-full aspect-video object-cover rounded-lg"
+                  />
+                  <div className="absolute bg-white/70 dark:bg-black/70 text-black/70 dark:text-white/70 px-2 py-1 flex flex-row items-center space-x-1 bottom-1 right-1 rounded-md">
+                    <PlayCircle size={15} />
+                    <p className="text-xs">Video</p>
                   </div>
-                ))}
+                </div>
+              ))}
             {videos.length > 4 && (
               <button
                 onClick={() => setOpen(true)}

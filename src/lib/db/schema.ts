@@ -42,6 +42,17 @@ export const messages = pgTable('messages', {
   status: text('status').$type<'answering' | 'completed' | 'error'>().default('answering'),
 });
 
+// Spaces table - personalized workspaces for specific tasks
+export const spaces = pgTable('spaces', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(), // References Neon Auth user ID
+  name: text('name').notNull(),
+  description: text('description'),
+  icon: text('icon'), // Emoji or icon identifier
+  systemPrompt: text('system_prompt'), // Custom AI persona for this space
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // Chats table - stores chat sessions
 // userId references Neon Auth's user ID (not a local users table)
 export const chats = pgTable('chats', {
@@ -52,6 +63,7 @@ export const chats = pgTable('chats', {
   sources: jsonb('sources').$type<SearchSources[]>().default([]),
   files: jsonb('files').$type<DBFile[]>().default([]),
   chatMode: text('chat_mode').$type<'chat' | 'research'>().default('chat'),
+  spaceId: text('space_id'), // Optional - null for regular chats, set for space chats
 });
 
 // Admin settings - global configuration stored in database
@@ -90,4 +102,27 @@ export const savedArticles = pgTable('saved_articles', {
   thumbnail: text('thumbnail'),
   source: text('source'),
   savedAt: timestamp('saved_at').defaultNow(),
+});
+
+// Documents table - stores rich text documents within spaces
+export const documents = pgTable('documents', {
+  id: text('id').primaryKey(),
+  spaceId: text('space_id').notNull(),
+  userId: text('user_id').notNull(),
+  title: text('title').notNull(),
+  content: jsonb('content'), // Tiptap JSON format
+  plainText: text('plain_text'), // For search
+  isPublic: text('is_public').$type<'true' | 'false'>().default('false'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Document shares table - for sharing documents with others
+export const documentShares = pgTable('document_shares', {
+  id: serial('id').primaryKey(),
+  documentId: text('document_id').notNull(),
+  sharedWithUserId: text('shared_with_user_id'), // Null for public link sharing
+  shareLink: text('share_link'), // Unique share link
+  permission: text('permission').$type<'view' | 'edit'>().default('view'),
+  createdAt: timestamp('created_at').defaultNow(),
 });

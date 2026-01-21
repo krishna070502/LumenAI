@@ -299,13 +299,15 @@ const MessageBox = ({
       <div className="flex flex-col space-y-9 lg:space-y-0 lg:flex-row lg:justify-between lg:space-x-9">
         <div
           ref={dividerRef}
-          className="flex flex-col space-y-6 w-full lg:w-9/12"
+          className="flex flex-col space-y-8 w-full lg:w-9/12"
         >
           {sources.length > 0 && (
-            <div className="flex flex-col space-y-2">
-              <div className="flex flex-row items-center space-x-2">
-                <BookCopy className="text-black dark:text-white" size={20} />
-                <h3 className="text-black dark:text-white font-medium text-xl">
+            <div className="flex flex-col space-y-3">
+              <div className="flex flex-row items-center space-x-2.5">
+                <div className="p-1.5 rounded-lg bg-white/5 border border-white/5">
+                  <BookCopy className="text-black/70 dark:text-white/70" size={18} />
+                </div>
+                <h3 className="text-black dark:text-white font-semibold text-xl tracking-tight">
                   Sources
                 </h3>
               </div>
@@ -348,17 +350,19 @@ const MessageBox = ({
 
           {section.widgets.length > 0 && <Renderer widgets={section.widgets} />}
 
-          <div className="flex flex-col space-y-2">
+          <div className="flex flex-col space-y-4">
             {sources.length > 0 && (
-              <div className="flex flex-row items-center space-x-2">
-                <Disc3
-                  className={cn(
-                    'text-black dark:text-white',
-                    isLast && loading ? 'animate-spin' : 'animate-none',
-                  )}
-                  size={20}
-                />
-                <h3 className="text-black dark:text-white font-medium text-xl">
+              <div className="flex flex-row items-center space-x-2.5">
+                <div className="p-1.5 rounded-lg bg-white/5 border border-white/5">
+                  <Disc3
+                    className={cn(
+                      'text-black/70 dark:text-white/70',
+                      isLast && loading ? 'animate-spin' : 'animate-none',
+                    )}
+                    size={18}
+                  />
+                </div>
+                <h3 className="text-black dark:text-white font-semibold text-xl tracking-tight">
                   Answer
                 </h3>
               </div>

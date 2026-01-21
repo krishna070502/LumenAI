@@ -84,27 +84,27 @@ const AssistantSteps = ({
   const headerTitle = chatMode === 'chat' ? 'Web Search' : 'Research Progress';
 
   return (
-    <div className="rounded-lg bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 overflow-hidden">
+    <div className="rounded-[20px] bg-white/[0.03] border border-white/5 overflow-hidden">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-3 hover:bg-light-200 dark:hover:bg-dark-200 transition duration-200"
+        className="w-full flex items-center justify-between p-4 hover:bg-white/[0.05] transition duration-200 group"
       >
-        <div className="flex items-center gap-2">
-          {chatMode === 'chat' ? (
-            <Search className="w-4 h-4 text-black dark:text-white" />
-          ) : (
-            <Brain className="w-4 h-4 text-black dark:text-white" />
-          )}
-          <span className="text-sm font-medium text-black dark:text-white">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 rounded-lg bg-white/5 border border-white/5">
+            <Search className="w-4 h-4 text-black/60 dark:text-white/60 group-hover:text-white transition-colors" />
+          </div>
+          <span className="text-sm font-semibold text-black/80 dark:text-white/80 tracking-tight">
             {headerTitle} ({subSteps.length}{' '}
             {subSteps.length === 1 ? 'step' : 'steps'})
           </span>
         </div>
-        {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-black/70 dark:text-white/70" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-black/70 dark:text-white/70" />
-        )}
+        <div className="p-1 rounded-full hover:bg-white/5 transition-colors">
+          {isExpanded ? (
+            <ChevronUp className="w-4 h-4 text-black/40 dark:text-white/40" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-black/40 dark:text-white/40" />
+          )}
+        </div>
       </button>
 
       <AnimatePresence>

@@ -32,47 +32,29 @@ const SearchImages = ({
           id={`search-images-${messageId}`}
           onClick={async () => {
             setLoading(true);
-
-            const chatModelProvider = localStorage.getItem(
-              'chatModelProviderId',
-            );
+            // ... (rest of the logic remains same)
+            const chatModelProvider = localStorage.getItem('chatModelProviderId');
             const chatModel = localStorage.getItem('chatModelKey');
-
             const res = await fetch(`/api/images`, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                query: query,
-                chatHistory: chatHistory,
-                chatModel: {
-                  providerId: chatModelProvider,
-                  key: chatModel,
-                },
-              }),
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query, chatHistory, chatModel: { providerId: chatModelProvider, key: chatModel } }),
             });
-
             const data = await res.json();
-
             const images = data.images ?? [];
             setImages(images);
-            setSlides(
-              images.map((image: Image) => {
-                return {
-                  src: image.img_src,
-                };
-              }),
-            );
+            setSlides(images.map((img: Image) => ({ src: img.img_src })));
             setLoading(false);
           }}
-          className="border border-dashed border-light-200 dark:border-dark-200 hover:bg-light-200 dark:hover:bg-dark-200 active:scale-95 duration-200 transition px-4 py-2 flex flex-row items-center justify-between rounded-lg dark:text-white text-sm w-full"
+          className="bg-white/[0.03] border border-white/5 hover:bg-white/[0.08] active:scale-95 duration-200 transition px-4 py-3.5 flex flex-row items-center justify-between rounded-xl dark:text-white/80 text-sm w-full group"
         >
-          <div className="flex flex-row items-center space-x-2">
-            <ImagesIcon size={17} />
-            <p>Search images</p>
+          <div className="flex flex-row items-center space-x-3">
+            <div className="p-1 rounded-md bg-white/5 border border-white/5">
+              <ImagesIcon size={16} className="text-white/40 group-hover:text-white transition-colors" />
+            </div>
+            <p className="font-medium tracking-tight">Search images</p>
           </div>
-          <PlusIcon className="text-[#24A0ED]" size={17} />
+          <PlusIcon className="text-white/20 group-hover:text-[#24A0ED] transition-colors" size={16} />
         </button>
       )}
       {loading && (
@@ -90,37 +72,37 @@ const SearchImages = ({
           <div className="grid grid-cols-2 gap-2">
             {images.length > 4
               ? images.slice(0, 3).map((image, i) => (
-                  <img
-                    onClick={() => {
-                      setOpen(true);
-                      setSlides([
-                        slides[i],
-                        ...slides.slice(0, i),
-                        ...slides.slice(i + 1),
-                      ]);
-                    }}
-                    key={i}
-                    src={image.img_src}
-                    alt={image.title}
-                    className="h-full w-full aspect-video object-cover rounded-lg transition duration-200 active:scale-95 hover:scale-[1.02] cursor-zoom-in"
-                  />
-                ))
+                <img
+                  onClick={() => {
+                    setOpen(true);
+                    setSlides([
+                      slides[i],
+                      ...slides.slice(0, i),
+                      ...slides.slice(i + 1),
+                    ]);
+                  }}
+                  key={i}
+                  src={image.img_src}
+                  alt={image.title}
+                  className="h-full w-full aspect-video object-cover rounded-lg transition duration-200 active:scale-95 hover:scale-[1.02] cursor-zoom-in"
+                />
+              ))
               : images.map((image, i) => (
-                  <img
-                    onClick={() => {
-                      setOpen(true);
-                      setSlides([
-                        slides[i],
-                        ...slides.slice(0, i),
-                        ...slides.slice(i + 1),
-                      ]);
-                    }}
-                    key={i}
-                    src={image.img_src}
-                    alt={image.title}
-                    className="h-full w-full aspect-video object-cover rounded-lg transition duration-200 active:scale-95 hover:scale-[1.02] cursor-zoom-in"
-                  />
-                ))}
+                <img
+                  onClick={() => {
+                    setOpen(true);
+                    setSlides([
+                      slides[i],
+                      ...slides.slice(0, i),
+                      ...slides.slice(i + 1),
+                    ]);
+                  }}
+                  key={i}
+                  src={image.img_src}
+                  alt={image.title}
+                  className="h-full w-full aspect-video object-cover rounded-lg transition duration-200 active:scale-95 hover:scale-[1.02] cursor-zoom-in"
+                />
+              ))}
             {images.length > 4 && (
               <button
                 onClick={() => setOpen(true)}

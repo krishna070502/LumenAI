@@ -78,7 +78,7 @@ const EmptyChat = () => {
 
   return (
     <div className="relative">
-      <div className="flex flex-col items-center justify-center min-h-screen max-w-screen-sm mx-auto p-2 space-y-4">
+      <div className="flex flex-col items-center justify-center min-h-screen max-w-screen-md mx-auto p-4 space-y-6">
         <div className="flex flex-col items-center justify-center w-full space-y-6">
           <div className="text-center space-y-2">
             <h2
