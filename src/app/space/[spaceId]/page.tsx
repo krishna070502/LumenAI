@@ -88,7 +88,7 @@ const SpacePage = () => {
                 </div>
 
                 {/* Chat Content */}
-                <ChatProvider>
+                <ChatProvider spaceSystemPrompt={space.systemPrompt}>
                     <SpaceChatWindow space={space} />
                 </ChatProvider>
             </div>

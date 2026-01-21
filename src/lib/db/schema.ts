@@ -112,6 +112,7 @@ export const documents = pgTable('documents', {
   title: text('title').notNull(),
   content: jsonb('content'), // Tiptap JSON format
   plainText: text('plain_text'), // For search
+  aiChatHistory: jsonb('ai_chat_history').$type<{ role: 'user' | 'assistant', content: string }[]>().default([]), // LumenAI chat messages
   isPublic: text('is_public').$type<'true' | 'false'>().default('false'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),

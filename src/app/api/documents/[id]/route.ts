@@ -70,7 +70,7 @@ export async function PATCH(
         }
 
         const body = await req.json();
-        const { title, content, plainText } = body;
+        const { title, content, plainText, aiChatHistory } = body;
 
         await db
             .update(documents)
@@ -78,6 +78,7 @@ export async function PATCH(
                 title: title?.trim() ?? doc.title,
                 content: content ?? doc.content,
                 plainText: plainText ?? doc.plainText,
+                aiChatHistory: aiChatHistory ?? doc.aiChatHistory,
                 updatedAt: new Date(),
             })
             .where(eq(documents.id, docId));

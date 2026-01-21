@@ -44,7 +44,22 @@ export async function POST(
         }
 
         const body = await req.json();
-        const { prompt, mode, existingContent } = body;
+        const { prompt, mode, existingContent, conversationHistory } = body;
+
+        // Build document context for AI
+        const documentContext = `
+DOCUMENT TITLE: ${doc.title}
+
+DOCUMENT CONTENT:
+${existingContent || doc.plainText || '(Empty document)'}
+`.trim();
+
+        // Build conversation history string
+        const historyContext = conversationHistory && conversationHistory.length > 0
+            ? '\n\nPREVIOUS CONVERSATION:\n' + conversationHistory.map((msg: { role: string, content: string }) =>
+                `${msg.role === 'user' ? 'User' : 'LumenAI'}: ${msg.content}`
+            ).join('\n')
+            : '';
 
         // mode: 'generate' for full doc, 'assist' for help writing, 'continue' for continuation
         let systemPrompt = '';
@@ -72,18 +87,55 @@ STRUCTURE FOR RESEARCH PAPERS:
 
 Write comprehensive, well-researched content with proper citations style (Author, Year) where applicable.`;
             userPrompt = `Generate a professional, well-structured document about: ${prompt}`;
-        } else if (mode === 'assist') {
-            systemPrompt = `You are a professional writing assistant for documents and research papers.
+        } else if (mode === 'assist' || mode === 'copilot') {
+            // Copilot mode - writes content for direct insertion into document
+            systemPrompt = `You are LumenAI, a professional writing assistant for documents and research papers. You have full context of the document you're helping with.
+
+CURRENT DOCUMENT CONTEXT:
+${documentContext}
+${historyContext}
 
 RULES:
 - Output ONLY the text to insert, no meta-commentary
 - Use proper markdown formatting (## headings, **bold**, - bullets, 1. numbered)
 - Match the existing document's style and tone
 - Write clear, professional prose
-- Structure content logically with proper sections`;
-            userPrompt = existingContent
-                ? `Document context:\n${existingContent}\n\nRequest: ${prompt}`
-                : prompt;
+- Structure content logically with proper sections
+- You can reference and discuss the document content when asked questions about it`;
+            userPrompt = prompt;
+        } else if (mode === 'askLumen') {
+            // Ask Lumen mode - answers questions about the document (chat only, no insertion)
+            systemPrompt = `You are LumenAI, an intelligent document assistant. You can see and understand the user's document. Answer their questions helpfully and accurately.
+
+CURRENT DOCUMENT CONTEXT:
+${documentContext}
+${historyContext}
+
+RULES:
+- Answer questions about the document content clearly and accurately
+- Provide helpful explanations and insights
+- Reference specific parts of the document when relevant
+- Be conversational and helpful
+- Do NOT format your response for document insertion
+- Respond naturally as if having a conversation about the document`;
+            userPrompt = prompt;
+        } else if (mode === 'lumenHelp') {
+            // Lumen Help mode - provides writing suggestions and ideas (chat only)
+            systemPrompt = `You are LumenAI, an expert writing coach and document consultant. You help users improve their writing by providing ideas, suggestions, and feedback.
+
+CURRENT DOCUMENT CONTEXT:
+${documentContext}
+${historyContext}
+
+RULES:
+- Provide constructive feedback on the document's structure, clarity, and flow
+- Suggest improvements for formatting, organization, and readability
+- Offer creative ideas for expanding or enhancing the content
+- Give specific, actionable suggestions
+- Be encouraging and supportive
+- Format your suggestions as a conversational response, NOT as document content
+- Use bullet points for lists of suggestions when helpful`;
+            userPrompt = prompt;
         } else if (mode === 'continue') {
             systemPrompt = `You are a professional document continuation expert. Continue writing seamlessly.
 

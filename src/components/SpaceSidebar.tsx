@@ -124,13 +124,24 @@ const SpaceSidebar = () => {
                         Actions
                     </span>
                 </div>
-                <button
-                    onClick={() => { }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/60 hover:bg-white/5 hover:text-white transition-all group"
+                <Link
+                    href={`/space/${spaceId}/settings`}
+                    className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
+                        pathname?.includes(`/space/${spaceId}/settings`)
+                            ? "bg-purple-600/10 text-purple-400 border border-purple-500/20"
+                            : "text-white/60 hover:bg-white/5 hover:text-white"
+                    )}
                 >
-                    <Settings size={18} className="text-white/40 group-hover:text-white/70" />
+                    <Settings size={18} className={cn(
+                        "transition-colors",
+                        pathname?.includes(`/space/${spaceId}/settings`) ? "text-purple-400" : "text-white/40 group-hover:text-white/70"
+                    )} />
                     <span className="text-sm font-medium">Settings</span>
-                </button>
+                    {pathname?.includes(`/space/${spaceId}/settings`) && (
+                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+                    )}
+                </Link>
             </nav>
 
             {/* Bottom Section */}

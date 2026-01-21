@@ -48,6 +48,7 @@ type ChatContext = {
   embeddingModelProvider: EmbeddingModelProvider;
   researchEnded: boolean;
   title: string;
+  spaceSystemPrompt: string | null;
   setResearchEnded: (ended: boolean) => void;
   setOptimizationMode: (mode: string) => void;
   setChatMode: (mode: 'chat' | 'research') => void;
@@ -272,6 +273,7 @@ export const chatContext = createContext<ChatContext>({
   embeddingModelProvider: { key: '', providerId: '' },
   researchEnded: false,
   title: '',
+  spaceSystemPrompt: null,
   rewrite: () => { },
   sendMessage: async () => { },
   setFileIds: () => { },
@@ -284,7 +286,7 @@ export const chatContext = createContext<ChatContext>({
   setResearchEnded: () => { },
 });
 
-export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
+export const ChatProvider = ({ children, spaceSystemPrompt = null }: { children: React.ReactNode; spaceSystemPrompt?: string | null }) => {
   const params: { chatId: string } = useParams();
 
   const searchParams = useSearchParams();
@@ -788,7 +790,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           key: embeddingModelProvider.key,
           providerId: embeddingModelProvider.providerId,
         },
-        systemInstructions: localStorage.getItem('systemInstructions'),
+        systemInstructions: spaceSystemPrompt || localStorage.getItem('systemInstructions'),
         memoryEnabled: localStorage.getItem('memoryEnabled') !== 'false',
       }),
     });
@@ -868,6 +870,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         embeddingModelProvider,
         researchEnded,
         title,
+        spaceSystemPrompt,
         setResearchEnded,
         setOptimizationMode,
         setChatMode,

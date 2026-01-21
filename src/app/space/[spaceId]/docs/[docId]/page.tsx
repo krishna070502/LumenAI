@@ -88,6 +88,13 @@ const DocumentEditor = () => {
     const [aiChatInput, setAIChatInput] = useState('');
     const [aiChatMessages, setAIChatMessages] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
     const [aiChatLoading, setAIChatLoading] = useState(false);
+    const [aiChatMode, setAIChatMode] = useState<'copilot' | 'askLumen' | 'lumenHelp'>('copilot');
+
+    // AI Auto-suggestion state
+    const [suggestion, setSuggestion] = useState('');
+    const [suggestionLoading, setSuggestionLoading] = useState(false);
+    const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastTextRef = useRef('');
 
     // Refs for auto-save to avoid stale closures
     const titleRef = useRef(title);
@@ -121,12 +128,72 @@ const DocumentEditor = () => {
             attributes: {
                 class: 'prose prose-invert max-w-none w-full focus:outline-none min-h-[60vh] text-white/90 leading-relaxed prose-h1:text-4xl prose-h2:text-3xl prose-h3:text-2xl prose-p:my-2 prose-headings:mb-4 prose-headings:mt-8 first:prose-headings:mt-0',
             },
+            handleKeyDown: (view, event) => {
+                // Tab to accept suggestion
+                if (event.key === 'Tab' && suggestion) {
+                    event.preventDefault();
+                    view.dispatch(view.state.tr.insertText(suggestion));
+                    setSuggestion('');
+                    return true;
+                }
+                // Escape to dismiss suggestion
+                if (event.key === 'Escape' && suggestion) {
+                    setSuggestion('');
+                    return true;
+                }
+                return false;
+            },
         },
         onUpdate: ({ editor }) => {
             contentRef.current = editor.getJSON();
             debouncedSave(editor.getJSON(), editor.getText());
+
+            // Clear existing suggestion on typing
+            setSuggestion('');
+
+            // Trigger suggestion fetch after typing pause
+            if (suggestionTimeoutRef.current) {
+                clearTimeout(suggestionTimeoutRef.current);
+            }
+
+            const currentText = editor.getText();
+            if (currentText.length > 20 && currentText !== lastTextRef.current) {
+                lastTextRef.current = currentText;
+                suggestionTimeoutRef.current = setTimeout(() => {
+                    fetchSuggestion(currentText);
+                }, 1000); // 1 second pause
+            }
         },
     });
+
+    // Fetch AI suggestion for autocomplete
+    const fetchSuggestion = async (fullText: string) => {
+        if (suggestionLoading) return;
+
+        // Get last 500 characters as context for better style matching
+        const context = fullText.slice(-500);
+        if (context.trim().length < 15) return;
+
+        setSuggestionLoading(true);
+        try {
+            const res = await fetch(`/api/documents/${docId}/suggest`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.suggestion && data.suggestion.trim()) {
+                    setSuggestion(data.suggestion);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to fetch suggestion:', error);
+        } finally {
+            setSuggestionLoading(false);
+        }
+    };
 
     // Debounced save function
     const debouncedSave = useCallback(
@@ -184,6 +251,10 @@ const DocumentEditor = () => {
                     setTitle(data.document.title);
                     if (editor && data.document.content) {
                         editor.commands.setContent(data.document.content);
+                    }
+                    // Load AI chat history
+                    if (data.document.aiChatHistory && data.document.aiChatHistory.length > 0) {
+                        setAIChatMessages(data.document.aiChatHistory);
                     }
                 } else {
                     router.push(`/space/${spaceId}/docs`);
@@ -364,12 +435,27 @@ const DocumentEditor = () => {
         toast.success('PDF exported successfully!');
     };
 
-    // AI Sidebar chat handler - directly inserts into document
+    // Save AI chat history to database
+    const saveAIChatHistory = async (messages: { role: 'user' | 'assistant', content: string }[]) => {
+        try {
+            await fetch(`/api/documents/${docId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ aiChatHistory: messages }),
+            });
+        } catch (error) {
+            console.error('Error saving chat history:', error);
+        }
+    };
+
+    // AI Sidebar chat handler - handles different modes
     const handleAIChatSend = async () => {
         if (!aiChatInput.trim() || aiChatLoading) return;
 
         const userMessage = aiChatInput.trim();
-        setAIChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        const newUserMessage = { role: 'user' as const, content: userMessage };
+        const updatedMessages = [...aiChatMessages, newUserMessage];
+        setAIChatMessages(updatedMessages);
         setAIChatInput('');
         setAIChatLoading(true);
 
@@ -379,24 +465,43 @@ const DocumentEditor = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     prompt: userMessage,
-                    mode: 'assist',
+                    mode: aiChatMode,
                     existingContent: editor?.getText() || '',
+                    conversationHistory: aiChatMessages,
                 }),
             });
 
             if (res.ok) {
                 const data = await res.json();
-                // Convert markdown to HTML and insert into document
-                const htmlContent = convertMarkdownToHTML(data.content);
-                editor?.commands.insertContent(htmlContent, { parseOptions: { preserveWhitespace: false } });
-                setAIChatMessages(prev => [...prev, { role: 'assistant', content: '✅ Content added to document' }]);
-                toast.success('Content added to document!');
+
+                if (aiChatMode === 'copilot') {
+                    // Copilot mode: insert content into document
+                    const htmlContent = convertMarkdownToHTML(data.content);
+                    editor?.commands.insertContent(htmlContent, { parseOptions: { preserveWhitespace: false } });
+                    const assistantMessage = { role: 'assistant' as const, content: '✅ Content added to document' };
+                    const finalMessages = [...updatedMessages, assistantMessage];
+                    setAIChatMessages(finalMessages);
+                    saveAIChatHistory(finalMessages);
+                    toast.success('Content added to document!');
+                } else {
+                    // Ask Lumen / Lumen Help: show response in chat only
+                    const assistantMessage = { role: 'assistant' as const, content: data.content };
+                    const finalMessages = [...updatedMessages, assistantMessage];
+                    setAIChatMessages(finalMessages);
+                    saveAIChatHistory(finalMessages);
+                }
 
             } else {
-                setAIChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+                const errorMessage = { role: 'assistant' as const, content: 'Sorry, I encountered an error. Please try again.' };
+                const finalMessages = [...updatedMessages, errorMessage];
+                setAIChatMessages(finalMessages);
+                saveAIChatHistory(finalMessages);
             }
         } catch (error) {
-            setAIChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
+            const errorMessage = { role: 'assistant' as const, content: 'Sorry, something went wrong.' };
+            const finalMessages = [...updatedMessages, errorMessage];
+            setAIChatMessages(finalMessages);
+            saveAIChatHistory(finalMessages);
         } finally {
             setAIChatLoading(false);
         }
@@ -797,7 +902,7 @@ const DocumentEditor = () => {
                                 ? 'bg-purple-600'
                                 : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700'
                                 }`}
-                            title="AI Assistant"
+                            title="LumenAI"
                         >
                             <Sparkles size={16} />
                             <span className="hidden sm:inline">AI</span>
@@ -934,8 +1039,35 @@ const DocumentEditor = () => {
                             style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
                         />
                         {/* Editor Content */}
-                        <div className="">
+                        <div className="relative">
                             <EditorContent editor={editor} className="w-full" />
+                            {/* AI Suggestion Ghost Text Overlay */}
+                            {suggestion && (
+                                <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
+                                    <div className="bg-[#252525] border border-purple-500/30 rounded-xl px-4 py-3 shadow-xl max-w-xl">
+                                        <div className="flex items-start gap-3">
+                                            <Sparkles size={16} className="text-purple-400 mt-0.5 shrink-0" />
+                                            <div className="flex-1">
+                                                <p className="text-white/70 text-sm italic">"{suggestion}"</p>
+                                                <div className="flex items-center gap-2 mt-2 text-xs">
+                                                    <kbd className="px-1.5 py-0.5 bg-purple-600/30 text-purple-300 rounded">Tab</kbd>
+                                                    <span className="text-white/40">to accept</span>
+                                                    <kbd className="px-1.5 py-0.5 bg-white/10 text-white/50 rounded ml-2">Esc</kbd>
+                                                    <span className="text-white/40">to dismiss</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {suggestionLoading && (
+                                <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
+                                    <div className="bg-[#252525] border border-white/10 rounded-xl px-4 py-2 shadow-xl flex items-center gap-2">
+                                        <Loader2 size={14} className="animate-spin text-purple-400" />
+                                        <span className="text-white/50 text-sm">Generating suggestion...</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -944,17 +1076,49 @@ const DocumentEditor = () => {
                 {showAISidebar && (
                     <div className="w-96 bg-[#1a1a1a] border-l border-white/10 flex flex-col shrink-0 h-full overflow-hidden">
                         {/* Sidebar Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                            <div className="flex items-center gap-2">
-                                <Sparkles size={18} className="text-purple-400" />
-                                <span className="text-white font-medium">AI Assistant</span>
+                        <div className="flex flex-col border-b border-white/10">
+                            <div className="flex items-center justify-between px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                    <img src="/logo-upscaled.png" alt="LumenAI" className="w-5 h-5" />
+                                    <span className="text-white font-medium">LumenAI</span>
+                                </div>
+                                <button
+                                    onClick={() => setShowAISidebar(false)}
+                                    className="p-1.5 rounded-lg hover:bg-white/10 text-white/50"
+                                >
+                                    <X size={16} />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setShowAISidebar(false)}
-                                className="p-1.5 rounded-lg hover:bg-white/10 text-white/50"
-                            >
-                                <X size={16} />
-                            </button>
+                            {/* Mode Tabs */}
+                            <div className="flex px-2 pb-2 gap-1">
+                                <button
+                                    onClick={() => setAIChatMode('copilot')}
+                                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${aiChatMode === 'copilot'
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                                        }`}
+                                >
+                                    ✒️ Copilot
+                                </button>
+                                <button
+                                    onClick={() => setAIChatMode('askLumen')}
+                                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${aiChatMode === 'askLumen'
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                                        }`}
+                                >
+                                    💬 Ask
+                                </button>
+                                <button
+                                    onClick={() => setAIChatMode('lumenHelp')}
+                                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${aiChatMode === 'lumenHelp'
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80'
+                                        }`}
+                                >
+                                    💡 Help
+                                </button>
+                            </div>
                         </div>
 
                         {/* Chat Messages */}
@@ -963,10 +1127,14 @@ const DocumentEditor = () => {
                                 <div className="text-center py-8">
                                     <Sparkles size={32} className="mx-auto text-purple-400/50 mb-3" />
                                     <p className="text-white/50 text-sm">
-                                        Ask AI anything about your document
+                                        {aiChatMode === 'copilot' && 'Tell me what to write'}
+                                        {aiChatMode === 'askLumen' && 'Ask anything about your document'}
+                                        {aiChatMode === 'lumenHelp' && 'Get writing tips and suggestions'}
                                     </p>
                                     <p className="text-white/30 text-xs mt-1">
-                                        Get help writing, editing, or generating content
+                                        {aiChatMode === 'copilot' && 'Content will be inserted into your document'}
+                                        {aiChatMode === 'askLumen' && 'I can see and understand your document'}
+                                        {aiChatMode === 'lumenHelp' && 'Ideas for improving your writing'}
                                     </p>
                                 </div>
                             )}
@@ -996,7 +1164,11 @@ const DocumentEditor = () => {
                                     value={aiChatInput}
                                     onChange={(e) => setAIChatInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleAIChatSend()}
-                                    placeholder="Ask AI anything..."
+                                    placeholder={
+                                        aiChatMode === 'copilot' ? 'Write an introduction about...' :
+                                            aiChatMode === 'askLumen' ? 'What is this document about?' :
+                                                'How can I improve this document?'
+                                    }
                                     className="flex-1 bg-transparent text-white text-sm focus:outline-none placeholder-white/30"
                                 />
                                 <button
