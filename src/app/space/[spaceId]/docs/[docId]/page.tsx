@@ -46,10 +46,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface SpaceSettings {
+    aiSuggestionsEnabled?: boolean;
+}
+
 interface Space {
     id: string;
     name: string;
     icon: string;
+    settings?: SpaceSettings;
 }
 
 interface Document {
@@ -95,6 +100,8 @@ const DocumentEditor = () => {
     const [suggestionLoading, setSuggestionLoading] = useState(false);
     const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastTextRef = useRef('');
+    const [aiSuggestionsEnabled, setAiSuggestionsEnabled] = useState(true);
+    const aiSuggestionsEnabledRef = useRef(true); // Ref for use in editor callbacks
 
     // Refs for auto-save to avoid stale closures
     const titleRef = useRef(title);
@@ -157,7 +164,7 @@ const DocumentEditor = () => {
             }
 
             const currentText = editor.getText();
-            if (currentText.length > 20 && currentText !== lastTextRef.current) {
+            if (currentText.length > 20 && currentText !== lastTextRef.current && aiSuggestionsEnabledRef.current) {
                 lastTextRef.current = currentText;
                 suggestionTimeoutRef.current = setTimeout(() => {
                     fetchSuggestion(currentText);
@@ -249,6 +256,10 @@ const DocumentEditor = () => {
                     setDoc(data.document);
                     setSpace(data.space);
                     setTitle(data.document.title);
+                    // Set AI suggestions enabled from space settings
+                    const suggestionsEnabled = data.space?.settings?.aiSuggestionsEnabled !== false;
+                    setAiSuggestionsEnabled(suggestionsEnabled);
+                    aiSuggestionsEnabledRef.current = suggestionsEnabled;
                     if (editor && data.document.content) {
                         editor.commands.setContent(data.document.content);
                     }

@@ -44,7 +44,7 @@ export async function PATCH(
         }
 
         const body = await req.json();
-        const { name, description, icon, systemPrompt } = body;
+        const { name, description, icon, systemPrompt, settings } = body;
 
         // Verify ownership
         const existingSpace = await db.query.spaces.findFirst({
@@ -62,6 +62,7 @@ export async function PATCH(
                 description: description?.trim() ?? existingSpace.description,
                 icon: icon || existingSpace.icon,
                 systemPrompt: systemPrompt?.trim() ?? existingSpace.systemPrompt,
+                settings: settings ?? existingSpace.settings,
             })
             .where(eq(spaces.id, id));
 

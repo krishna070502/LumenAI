@@ -42,6 +42,11 @@ export const messages = pgTable('messages', {
   status: text('status').$type<'answering' | 'completed' | 'error'>().default('answering'),
 });
 
+// Space settings interface
+export interface SpaceSettings {
+  aiSuggestionsEnabled?: boolean; // Controls if AI auto-suggestions are enabled in docs
+}
+
 // Spaces table - personalized workspaces for specific tasks
 export const spaces = pgTable('spaces', {
   id: text('id').primaryKey(),
@@ -50,6 +55,7 @@ export const spaces = pgTable('spaces', {
   description: text('description'),
   icon: text('icon'), // Emoji or icon identifier
   systemPrompt: text('system_prompt'), // Custom AI persona for this space
+  settings: jsonb('settings').$type<SpaceSettings>().default({}), // Space-specific settings
   createdAt: timestamp('created_at').defaultNow(),
 });
 
