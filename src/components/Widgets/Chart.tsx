@@ -39,7 +39,50 @@ const Chart = ({
         !Array.isArray(yAxisKeys) ||
         yAxisKeys.length === 0
     ) {
-        return null;
+        return (
+            <div className="flex flex-col items-center justify-center p-6 rounded-xl border border-light-200 dark:border-dark-200 bg-white dark:bg-dark-secondary">
+                <p className="text-sm text-gray-500">Chart data unavailable</p>
+            </div>
+        );
+    }
+
+    // Check if Y values are numeric - if not, show a table instead
+    const firstYKey = yAxisKeys[0];
+    const firstYValue = data[0]?.[firstYKey];
+    const isNumeric = typeof firstYValue === 'number';
+
+    if (!isNumeric) {
+        return (
+            <div className="flex flex-col space-y-4 w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {title && (
+                    <h3 className="text-lg font-semibold text-black dark:text-white px-1">
+                        {title}
+                    </h3>
+                )}
+                <div className="rounded-xl border border-light-200 dark:border-dark-200 bg-white dark:bg-dark-secondary p-4 overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-gray-200 dark:border-gray-700">
+                                <th className="text-left py-2 px-3 font-medium text-gray-600 dark:text-gray-300">{xAxisKey}</th>
+                                {yAxisKeys.map(key => (
+                                    <th key={key} className="text-left py-2 px-3 font-medium text-gray-600 dark:text-gray-300">{key}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.map((row, idx) => (
+                                <tr key={idx} className="border-b border-gray-100 dark:border-gray-800">
+                                    <td className="py-2 px-3 text-black dark:text-white">{row[xAxisKey]}</td>
+                                    {yAxisKeys.map(key => (
+                                        <td key={key} className="py-2 px-3 text-black dark:text-white">{row[key]}</td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
     }
     const renderChart = () => {
         switch (type) {

@@ -210,6 +210,8 @@ const MessageBox = ({
                   spaceId={block.data.spaceId}
                 />
               ))}
+            {/* Widget Blocks (Charts, Tables, etc.) */}
+            {section.widgets.length > 0 && <Renderer widgets={section.widgets} />}
             {hasContent ? (
               <div className="flex flex-col">
                 <Markdown

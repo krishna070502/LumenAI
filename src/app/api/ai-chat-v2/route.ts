@@ -358,9 +358,16 @@ ${modeInstructions}
 
 ${useSearch ? `SEARCH & TOOLS:
 You have access to: ${availableCapabilities.join(', ')}.
+
+IMPORTANT - USE YOUR TOOLS:
+- When asked to create a chart, timeline, or visualization → USE the generate_chart tool
+- When asked to compare data, show specifications, or list items → USE the generate_table tool  
+- When asked about weather → USE the get_weather tool
+- When asked about stocks → USE the get_stock_info tool
+- When asked to calculate → USE the calculate tool
+
 When search results are provided:
 - Synthesize information into a clear, well-structured response
-- Use tables for comparative data like prices or specifications
 - Cite sources naturally (not robotically)
 - Note when information might change frequently
 ` : `REASONING:
@@ -492,11 +499,59 @@ Remember: Make your responses visually appealing and easy to scan. Be helpful, b
                 }
             },
             generate_chart: {
-                description: 'Create a line, bar, or area chart to visualize numerical data.',
-                parameters: z.object({ type: z.enum(['line', 'bar', 'area']), title: z.string().optional(), data: z.array(z.record(z.string(), z.any())), xAxisKey: z.string(), yAxisKeys: z.array(z.string()), colors: z.array(z.string()).optional() }),
+                description: 'Create a line, bar, or area chart to visualize data. Provide data as an array of objects with named keys.',
+                parameters: z.object({
+                    title: z.string().optional(),
+                    data: z.any(),
+                }).passthrough(), // Allow any additional parameters
                 execute: async (params: any) => {
-                    session.emitBlock({ id: globalThis.crypto.randomUUID().slice(0, 14), type: 'widget', data: { widgetType: 'chart', params } });
-                    return { status: 'Chart generated' };
+                    try {
+                        console.log('[generate_chart] Execute called with:', JSON.stringify(params));
+
+                        // Normalize data if it's a string
+                        let chartData = params.data;
+                        if (typeof chartData === 'string') {
+                            try { chartData = JSON.parse(chartData); } catch (e) {
+                                console.error('[generate_chart] Failed to parse data:', e);
+                                chartData = [];
+                            }
+                        }
+
+                        // Handle various parameter name variations  
+                        const xKey = params.xAxisKey || params.x_axis || params.x_label || 'Year';
+                        const yKey = params.y_axis || params.y_label || (params.yAxisKeys?.[0]);
+
+                        // Convert [[x, y], ...] format to [{xKey: x, yKeyName: y}, ...]
+                        if (Array.isArray(chartData) && chartData.length > 0 && Array.isArray(chartData[0])) {
+                            const yKeyName = yKey || 'Value';
+                            chartData = chartData.map((row: any[]) => ({ [xKey]: row[0], [yKeyName]: row[1] }));
+                        }
+
+                        params.data = chartData;
+                        params.xAxisKey = xKey;
+
+                        // Derive yAxisKeys from actual data keys (excluding xAxisKey)
+                        if (chartData && chartData[0]) {
+                            const dataKeys = Object.keys(chartData[0]);
+                            const yKeys = dataKeys.filter(k => k !== xKey);
+                            params.yAxisKeys = yKeys.length > 0 ? yKeys : ['Value'];
+                        } else {
+                            params.yAxisKeys = yKey ? [yKey] : ['Value'];
+                        }
+
+                        params.type = params.type || 'line';
+                        delete params.x_label;
+                        delete params.x_axis;
+                        delete params.y_label;
+                        delete params.y_axis;
+
+                        console.log('[generate_chart] Normalized params:', JSON.stringify(params));
+                        session.emitBlock({ id: globalThis.crypto.randomUUID().slice(0, 14), type: 'widget', data: { widgetType: 'chart', params } });
+                        return { status: 'Chart generated', message: 'The chart is now displayed. Please describe what it shows.' };
+                    } catch (error) {
+                        console.error('[generate_chart] Execution error:', error);
+                        return { error: 'Failed to generate chart' };
+                    }
                 }
             },
             get_latest_news: {
@@ -708,11 +763,33 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                     ? `${message.content}\n\n---\n${searchContext}`
                     : message.content;
 
-                const result = streamText({
+                // Build chat options with tools when available
+                const searchChatOptions: any = {
                     model: nim.chatModel('meta/llama-3.1-405b-instruct'),
                     system: systemPrompt,
                     messages: [...formattedHistory, { role: 'user', content: enhancedMessage }],
-                });
+                    onStepFinish: (step: any) => {
+                        console.log('[ai-chat-v2] Step finished:', JSON.stringify({
+                            stepType: step.stepType,
+                            toolCalls: step.toolCalls?.length,
+                            toolResults: step.toolResults?.length,
+                            isContinued: step.isContinued,
+                        }));
+                        if (step.toolResults) {
+                            step.toolResults.forEach((result: any) => {
+                                console.log('[ai-chat-v2] Tool result details:', result.toolName, result.result);
+                            });
+                        }
+                    },
+                };
+
+                // Add tools when we have active tools
+                if (Object.keys(activeTools).length > 0) {
+                    searchChatOptions.tools = activeTools;
+                    searchChatOptions.maxSteps = 5; // Allow multiple tool calls
+                }
+
+                const result = streamText(searchChatOptions);
 
                 let textBlockId = '';
                 let lastUpdateTime = 0;
@@ -741,6 +818,10 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                                 lastUpdateLength = fullText.length;
                             }
                         }
+                    } else if (part.type === 'tool-call') {
+                        console.log(`[ai-chat-v2] Tool call in search flow: ${part.toolName}`, (part as any).input || (part as any).args);
+                    } else if (part.type === 'tool-result') {
+                        console.log(`[ai-chat-v2] Tool result in search flow for ${part.toolName}:`, (part as any).output || (part as any).result);
                     }
                 }
                 // Final update to ensure all text is captured

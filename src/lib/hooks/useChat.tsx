@@ -370,6 +370,8 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
         .filter((b) => b.type === 'widget')
         .map((b) => b.data) as Widget[];
 
+      console.log('[useChat sections] Message responseBlocks:', msg.responseBlocks.length, 'widget blocks:', widgetBlocks.length);
+
       msg.responseBlocks.forEach((block) => {
         if (block.type === 'text') {
           let processedText = block.data;
