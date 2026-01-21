@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter, notFound } from 'next/navigation';
-import { ArrowLeft, Settings, Loader2, FileText } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { ChatProvider } from '@/lib/hooks/useChat';
-import SpaceChatWindow from '@/components/SpaceChatWindow';
+import Chat from '@/components/Chat';
 import Link from 'next/link';
 
 interface Space {
@@ -13,13 +13,13 @@ interface Space {
     description: string | null;
     icon: string;
     systemPrompt: string | null;
-    createdAt: string;
 }
 
-const SpacePage = () => {
+const SpaceChatPage = () => {
     const params = useParams();
     const router = useRouter();
     const spaceId = params.spaceId as string;
+    const chatId = params.chatId as string;
 
     const [space, setSpace] = useState<Space | null>(null);
     const [loading, setLoading] = useState(true);
@@ -71,29 +71,11 @@ const SpacePage = () => {
 
     return (
         <div className="h-full flex flex-col overflow-hidden">
-            <div className="h-full flex flex-col pt-10 px-6">
-                {/* Minimal Header */}
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3 invisible lg:visible lg:opacity-0 pointer-events-none">
-                        <span className="text-2xl">{space.icon}</span>
-                        <h1 className="font-semibold text-xl text-black dark:text-white">
-                            {space.name}
-                        </h1>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button className="p-2 rounded-lg hover:bg-light-200 dark:hover:bg-dark-200 transition text-black/60 dark:text-white/60">
-                            <Settings size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Chat Content */}
-                <ChatProvider spaceSystemPrompt={space.systemPrompt} spaceId={space.id}>
-                    <SpaceChatWindow space={space} />
-                </ChatProvider>
-            </div>
+            <ChatProvider spaceSystemPrompt={space.systemPrompt} spaceId={space.id}>
+                <Chat />
+            </ChatProvider>
         </div>
     );
 };
 
-export default SpacePage;
+export default SpaceChatPage;

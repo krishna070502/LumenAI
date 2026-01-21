@@ -49,6 +49,7 @@ type ChatContext = {
   researchEnded: boolean;
   title: string;
   spaceSystemPrompt: string | null;
+  spaceId: string | null;
   setResearchEnded: (ended: boolean) => void;
   setOptimizationMode: (mode: string) => void;
   setChatMode: (mode: 'chat' | 'research') => void;
@@ -274,6 +275,7 @@ export const chatContext = createContext<ChatContext>({
   researchEnded: false,
   title: '',
   spaceSystemPrompt: null,
+  spaceId: null,
   rewrite: () => { },
   sendMessage: async () => { },
   setFileIds: () => { },
@@ -286,7 +288,7 @@ export const chatContext = createContext<ChatContext>({
   setResearchEnded: () => { },
 });
 
-export const ChatProvider = ({ children, spaceSystemPrompt = null }: { children: React.ReactNode; spaceSystemPrompt?: string | null }) => {
+export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = null }: { children: React.ReactNode; spaceSystemPrompt?: string | null; spaceId?: string | null }) => {
   const params: { chatId: string } = useParams();
 
   const searchParams = useSearchParams();
@@ -731,7 +733,9 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null }: { children:
     setResearchEnded(false);
     setMessageAppeared(false);
 
-    if (messages.length <= 1) {
+    // Only redirect to /c/{chatId} for non-space chats
+    // Space chats should stay on the current URL
+    if (messages.length <= 1 && !spaceId) {
       window.history.replaceState(null, '', `/c/${chatId}`);
     }
 
@@ -792,6 +796,7 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null }: { children:
         },
         systemInstructions: spaceSystemPrompt || localStorage.getItem('systemInstructions'),
         memoryEnabled: localStorage.getItem('memoryEnabled') !== 'false',
+        spaceId: spaceId,
       }),
     });
 
@@ -871,6 +876,7 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null }: { children:
         researchEnded,
         title,
         spaceSystemPrompt,
+        spaceId,
         setResearchEnded,
         setOptimizationMode,
         setChatMode,

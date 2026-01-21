@@ -28,11 +28,12 @@ import ThinkBox from './ThinkBox';
 import { useChat, Section } from '@/lib/hooks/useChat';
 import Citation from './MessageRenderer/Citation';
 import AssistantSteps from './AssistantSteps';
-import { ResearchBlock } from '@/lib/types';
+import { ResearchBlock, DocumentCreatedBlock as DocumentCreatedBlockType } from '@/lib/types';
 import Renderer from './Widgets/Renderer';
 import CodeBlock from './MessageRenderer/CodeBlock';
 import Callout from './MessageRenderer/Callout';
 import ActionButtons from './MessageActions/ActionButtons';
+import DocumentCreatedBlock from './DocumentCreatedBlock';
 
 const ThinkTagProcessor = ({
   children,
@@ -194,6 +195,21 @@ const MessageBox = ({
 
           {/* AI Response Content */}
           <div ref={dividerRef} className="w-full">
+            {/* Document Created Blocks */}
+            {section.message.responseBlocks
+              .filter(
+                (block): block is DocumentCreatedBlockType =>
+                  block.type === 'documentCreated',
+              )
+              .map((block) => (
+                <DocumentCreatedBlock
+                  key={block.id}
+                  documentId={block.data.documentId}
+                  title={block.data.title}
+                  url={block.data.url}
+                  spaceId={block.data.spaceId}
+                />
+              ))}
             {hasContent ? (
               <div className="flex flex-col">
                 <Markdown
@@ -349,6 +365,22 @@ const MessageBox = ({
             )}
 
           {section.widgets.length > 0 && <Renderer widgets={section.widgets} />}
+
+          {/* Document Created Blocks */}
+          {section.message.responseBlocks
+            .filter(
+              (block): block is DocumentCreatedBlockType =>
+                block.type === 'documentCreated',
+            )
+            .map((block) => (
+              <DocumentCreatedBlock
+                key={block.id}
+                documentId={block.data.documentId}
+                title={block.data.title}
+                url={block.data.url}
+                spaceId={block.data.spaceId}
+              />
+            ))}
 
           <div className="flex flex-col space-y-4">
             {sources.length > 0 && (

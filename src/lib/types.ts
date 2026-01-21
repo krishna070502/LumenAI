@@ -115,9 +115,21 @@ export type ResearchBlock = {
   };
 };
 
+export type DocumentCreatedBlock = {
+  id: string;
+  type: 'documentCreated';
+  data: {
+    documentId: string;
+    title: string;
+    url: string;
+    spaceId: string;
+  };
+};
+
 export type Block =
   | TextBlock
   | SourceBlock
   | SuggestionBlock
   | WidgetBlock
-  | ResearchBlock;
+  | ResearchBlock
+  | DocumentCreatedBlock;

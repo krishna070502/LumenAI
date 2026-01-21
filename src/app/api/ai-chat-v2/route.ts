@@ -3,8 +3,8 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import SessionManager from '@/lib/session';
 import { getCurrentUser } from '@/lib/auth';
 import db from '@/lib/db';
-import { eq } from 'drizzle-orm';
-import { chats, messages } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { chats, messages, documents, spaces } from '@/lib/db/schema';
 import { SearchSources } from '@/lib/agents/search/types';
 import { Chunk } from '@/lib/types';
 import z from 'zod';
@@ -28,13 +28,21 @@ const nim = createOpenAICompatible({
     headers: { Authorization: `Bearer ${process.env.NVIDIA_NIM_API_KEY}` },
 });
 
-const ensureChatExists = async (input: { id: string; userId: string; query: string; chatMode?: 'chat' | 'research' }) => {
+const ensureChatExists = async (input: { id: string; userId: string; query: string; chatMode?: 'chat' | 'research'; spaceId?: string | null }) => {
     try {
-        console.log(`[ai-chat-v2] ensureChatExists called with id: ${input.id}, userId: ${input.userId}`);
+        console.log(`[ai-chat-v2] ensureChatExists called with id: ${input.id}, userId: ${input.userId}, spaceId: ${input.spaceId || 'none'}`);
         const exists = await db.query.chats.findFirst({ where: eq(chats.id, input.id) });
         if (!exists) {
             console.log(`[ai-chat-v2] Chat ${input.id} does not exist, creating...`);
-            await db.insert(chats).values({ id: input.id, userId: input.userId, title: input.query.slice(0, 50), sources: [] as SearchSources[], files: [], chatMode: input.chatMode || 'chat' });
+            await db.insert(chats).values({
+                id: input.id,
+                userId: input.userId,
+                title: input.query.slice(0, 50),
+                sources: [] as SearchSources[],
+                files: [],
+                chatMode: input.chatMode || 'chat',
+                spaceId: input.spaceId || null
+            });
             console.log(`[ai-chat-v2] Chat ${input.id} created successfully.`);
         } else {
             console.log(`[ai-chat-v2] Chat ${input.id} already exists.`);
@@ -63,16 +71,121 @@ const generateChatTitle = async (query: string, response: string): Promise<strin
     }
 };
 
+// Convert markdown to Tiptap JSON format
+function convertMarkdownToTiptap(markdown: string): any {
+    const lines = markdown.split('\n');
+    const content: any[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        // Skip empty lines
+        if (!trimmed) {
+            continue;
+        }
+
+        // Heading 1: # Title
+        if (trimmed.startsWith('# ')) {
+            content.push({
+                type: 'heading',
+                attrs: { level: 1 },
+                content: [{ type: 'text', text: trimmed.slice(2) }]
+            });
+            continue;
+        }
+
+        // Heading 2: ## Title
+        if (trimmed.startsWith('## ')) {
+            content.push({
+                type: 'heading',
+                attrs: { level: 2 },
+                content: [{ type: 'text', text: trimmed.slice(3) }]
+            });
+            continue;
+        }
+
+        // Heading 3: ### Title
+        if (trimmed.startsWith('### ')) {
+            content.push({
+                type: 'heading',
+                attrs: { level: 3 },
+                content: [{ type: 'text', text: trimmed.slice(4) }]
+            });
+            continue;
+        }
+
+        // Bullet list item
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            const lastItem = content[content.length - 1];
+            const itemText = trimmed.slice(2);
+            const textContent = parseInlineFormatting(itemText);
+            const listItem = {
+                type: 'listItem',
+                content: [{ type: 'paragraph', content: textContent }]
+            };
+            if (lastItem?.type === 'bulletList') {
+                lastItem.content.push(listItem);
+            } else {
+                content.push({ type: 'bulletList', content: [listItem] });
+            }
+            continue;
+        }
+
+        // Numbered list item
+        if (/^\d+\.\s/.test(trimmed)) {
+            const text = trimmed.replace(/^\d+\.\s/, '');
+            const lastItem = content[content.length - 1];
+            const textContent = parseInlineFormatting(text);
+            const listItem = {
+                type: 'listItem',
+                content: [{ type: 'paragraph', content: textContent }]
+            };
+            if (lastItem?.type === 'orderedList') {
+                lastItem.content.push(listItem);
+            } else {
+                content.push({ type: 'orderedList', content: [listItem] });
+            }
+            continue;
+        }
+
+        // Regular paragraph
+        const textContent = parseInlineFormatting(trimmed);
+        content.push({ type: 'paragraph', content: textContent });
+    }
+
+    return { type: 'doc', content };
+}
+
+// Parse inline markdown formatting (bold, italic)
+function parseInlineFormatting(text: string): any[] {
+    const result: any[] = [];
+    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+
+    for (const part of parts) {
+        if (!part) continue;
+        if (part.startsWith('**') && part.endsWith('**')) {
+            result.push({ type: 'text', marks: [{ type: 'bold' }], text: part.slice(2, -2) });
+        } else if (part.startsWith('*') && part.endsWith('*')) {
+            result.push({ type: 'text', marks: [{ type: 'italic' }], text: part.slice(1, -1) });
+        } else {
+            result.push({ type: 'text', text: part });
+        }
+    }
+
+    return result.length > 0 ? result : [{ type: 'text', text }];
+}
+
 export async function POST(req: Request) {
     try {
         const user = await getCurrentUser();
         if (!user) return Response.json({ message: 'Unauthorized' }, { status: 401 });
 
         const body = await req.json();
-        const { message, history, chatId, messageId, systemInstructions, sources = [], optimizationMode = 'balanced', chatMode = 'chat', memoryEnabled = true, files = [] } = body;
+        const { message, history, chatId, messageId, systemInstructions, sources = [], optimizationMode = 'balanced', chatMode = 'chat', memoryEnabled = true, files = [], spaceId = null } = body;
         if (!message?.content) return Response.json({ message: 'No content' }, { status: 400 });
 
-        await ensureChatExists({ id: chatId, userId: user.id, query: message.content, chatMode });
+        await ensureChatExists({ id: chatId, userId: user.id, query: message.content, chatMode, spaceId });
 
         // Retrieve Document Context from uploaded files
         let documentContext = '';
@@ -214,6 +327,7 @@ Answer "NO" if the query:
         if (sources.includes('academic')) availableCapabilities.push('Academic Search');
         if (sources.includes('discussions')) availableCapabilities.push('Social Search (Reddit/Discussions)');
         if (useSearch) availableCapabilities.push('Tools (Weather, Stocks, Calculator, Tables, Charts, Media Search)');
+        if (spaceId) availableCapabilities.push('Document Creation (create new documents with generated content)');
 
         const systemPrompt = `You are LumenAI, an intelligent AI assistant designed to enlighten and empower users. Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
 
@@ -252,6 +366,12 @@ When search results are provided:
 ` : `REASONING:
 For complex questions, think through the problem step by step. You may use <think></think> tags at the START of your response for internal reasoning, then provide a clear answer after.
 `}
+${spaceId ? `DOCUMENT CREATION:
+You can create new documents within this space when the user asks. When a user requests to create a document:
+- Use the create_document tool with an appropriate title and topic
+- After creating, confirm success and let them know they can click the link to view it
+- Examples of when to create: "create a document about...", "write a document on...", "generate a document for...", "make a document explaining..."
+` : ''}
 ${systemInstructions ? `USER PREFERENCES: ${systemInstructions}` : ''}
 
 ${retrievedMemories.length > 0 ? `IMPORTANT - WHAT YOU KNOW ABOUT THIS USER:
@@ -430,6 +550,105 @@ Remember: Make your responses visually appealing and easy to scan. Be helpful, b
                     session.emit('mediaSearch', { query, type });
                     return { status: `Started ${type} search for ${query}` };
                 }
+            },
+            create_document: {
+                description: 'Create a new document with AI-generated content within the current space. Use this when the user asks you to create, write, or generate a document about a topic. Only available when chatting within a space.',
+                parameters: z.object({
+                    title: z.string().describe('The title of the document to create'),
+                    topic: z.string().describe('The main topic or subject for the document content'),
+                    requirements: z.string().optional().describe('Any specific requirements or instructions for the content')
+                }),
+                execute: async ({ title, topic, requirements }: { title: string, topic: string, requirements?: string }) => {
+                    if (!spaceId) {
+                        return { error: 'Document creation is only available within a space. Please navigate to a space first.' };
+                    }
+
+                    try {
+                        // Verify space ownership
+                        const space = await db.query.spaces.findFirst({
+                            where: and(eq(spaces.id, spaceId), eq(spaces.userId, user.id)),
+                        });
+
+                        if (!space) {
+                            return { error: 'Space not found or unauthorized' };
+                        }
+
+                        // Generate document content using AI
+                        const documentTitle = title || topic;
+                        const docGenSystemPrompt = `You are a master document writer and research expert. Generate professionally structured documents.
+
+FORMATTING RULES:
+- Use # for main title (only one)
+- Use ## for major sections
+- Use ### for subsections  
+- Use **bold** for emphasis and key terms
+- Use bullet points (-) for lists of items
+- Use numbered lists (1. 2. 3.) for sequential steps or ranked items
+- Use proper paragraph breaks between ideas
+- Maintain consistent academic/professional tone
+
+STRUCTURE:
+1. Title (use the provided title)
+2. Introduction with context and objectives
+3. Main body with clear sections
+4. Key points and details
+5. Conclusion or summary
+
+Write comprehensive, well-researched content. Be thorough and informative.`;
+
+                        const docGenPrompt = requirements
+                            ? `Create a comprehensive document titled "${documentTitle}" about: ${topic}\n\nAdditional requirements: ${requirements}`
+                            : `Create a comprehensive document titled "${documentTitle}" about: ${topic}`;
+
+                        const docResult = await generateText({
+                            model: nim.chatModel('meta/llama-3.1-405b-instruct'),
+                            system: docGenSystemPrompt,
+                            prompt: docGenPrompt,
+                        });
+
+                        const generatedContent = docResult.text;
+
+                        // Convert markdown to Tiptap JSON format
+                        const tiptapContent = convertMarkdownToTiptap(generatedContent);
+
+                        // Create the document
+                        const docId = globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 32);
+
+                        await db.insert(documents).values({
+                            id: docId,
+                            spaceId,
+                            userId: user.id,
+                            title: documentTitle,
+                            content: tiptapContent,
+                            plainText: generatedContent,
+                        });
+
+                        const docUrl = `/space/${spaceId}/docs/${docId}`;
+
+                        // Emit a documentCreated block
+                        session.emitBlock({
+                            id: globalThis.crypto.randomUUID().slice(0, 14),
+                            type: 'documentCreated',
+                            data: {
+                                documentId: docId,
+                                title: documentTitle,
+                                url: docUrl,
+                                spaceId: spaceId
+                            }
+                        });
+
+                        return {
+                            success: true,
+                            documentId: docId,
+                            title: documentTitle,
+                            url: docUrl,
+                            message: `Document "${documentTitle}" has been created successfully!`
+                        };
+                    } catch (err) {
+                        console.error('[ai-chat-v2] Document creation error:', err);
+                        return { error: 'Failed to create document' };
+                    }
+                }
             }
         };
 
@@ -447,6 +666,11 @@ Remember: Make your responses visually appealing and easy to scan. Be helpful, b
             activeTools.generate_table = tools.generate_table;
             activeTools.generate_chart = tools.generate_chart;
             activeTools.search_media = tools.search_media;
+        }
+
+        // Add document creation tool when in a space
+        if (spaceId) {
+            activeTools.create_document = tools.create_document;
         }
 
         // Simplified Search Flow: Pre-execute search then stream response with results
@@ -573,11 +797,20 @@ Remember: Make your responses visually appealing and easy to scan. Be helpful, b
             (async () => {
                 let fullText = '';
                 try {
-                    const result = streamText({
+                    // Include tools when in a space (for document creation)
+                    const chatOptions: any = {
                         model: nim.chatModel('meta/llama-3.1-405b-instruct'),
                         system: systemPrompt,
                         messages: [...formattedHistory, { role: 'user', content: message.content }],
-                    });
+                    };
+
+                    // Add tools and maxSteps when in a space
+                    if (spaceId && Object.keys(activeTools).length > 0) {
+                        chatOptions.tools = activeTools;
+                        chatOptions.maxSteps = 3; // Allow up to 3 tool calls
+                    }
+
+                    const result = streamText(chatOptions);
 
                     let textBlockId = '';
                     let lastUpdateTime = 0;
@@ -606,6 +839,10 @@ Remember: Make your responses visually appealing and easy to scan. Be helpful, b
                                     lastUpdateLength = fullText.length;
                                 }
                             }
+                        } else if (part.type === 'tool-call') {
+                            console.log(`[ai-chat-v2] Tool call: ${part.toolName}`, (part as any).input || (part as any).args);
+                        } else if (part.type === 'tool-result') {
+                            console.log(`[ai-chat-v2] Tool result for ${part.toolName}:`, (part as any).output || (part as any).result);
                         }
                     }
                     // Final update to ensure all text is captured
