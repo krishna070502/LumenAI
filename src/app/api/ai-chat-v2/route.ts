@@ -338,10 +338,46 @@ CRITICAL TOOL INSTRUCTIONS:
 - Simply decide to use a tool and it will be executed automatically
 - When you want to generate a chart, just invoke the generate_chart function directly
 
-If the user requests a chart, graph, visualization, or trends:
-→ Call the generate_chart tool with proper data
-→ The chart will render as a widget automatically
-→ Then describe what the chart shows
+NON-NEGOTIABLE TOOL RULE:
+If the user asks for:
+- a chart
+- a graph
+- a visualization
+- trends over time
+- comparisons over time
+- evolution over time
+
+You MUST call the generate_chart tool with NUMERIC data.
+FORBIDDEN RESPONSES:
+- Using generate_table instead of generate_chart (tables are NOT charts)
+- Text-only explanations describing what a chart "would look like"
+- Claiming you "cannot" or "were unable to" generate a chart
+- Markdown tables as substitutes for visual charts
+- Passing text/string values instead of numbers
+
+DATA FORMAT REQUIREMENTS:
+→ X-axis: Years, dates, or categories (strings are OK for x-axis)
+→ Y-axis: MUST be numeric values (integers or decimals)
+→ For qualitative concepts (like "AI evolution"), assign a numeric score (1-10 scale)
+
+EXAMPLE for "AI evolution chart 2019-2025":
+generate_chart({
+  title: "AI Evolution Score 2019-2025",
+  data: [
+    {Year: 2019, Score: 3},
+    {Year: 2020, Score: 5},
+    {Year: 2021, Score: 6},
+    {Year: 2022, Score: 7},
+    {Year: 2023, Score: 8},
+    {Year: 2024, Score: 9},
+    {Year: 2025, Score: 10}
+  ]
+})
+
+REQUIRED ACTION:
+→ Call generate_chart with proper numeric data
+→ The chart will render as a visual widget automatically
+→ Then briefly describe what the chart shows
 
 YOUR IDENTITY (IMPORTANT):
 - Your name is **LumenAI** (pronounced "Lumen-AI")
@@ -358,7 +394,6 @@ PERSONALITY & TONE:
 
 FORMATTING GUIDELINES:
 - Use emojis strategically to add visual interest (📌 ✅ 🔌 💡 🎯 etc.) - but don't overdo it
-- When presenting lists of items with data (prices, specs, etc.), use **markdown tables** for clarity
 - Use **bold** for emphasis on key points
 - Use bullet points for lists
 - Add helpful section headers when the response has multiple parts
@@ -530,10 +565,10 @@ Remember: Make your responses visually appealing and easy to scan. Be helpful, b
                 }
             },
             generate_chart: {
-                description: 'Create a line, bar, or area chart to visualize data. Provide data as an array of objects with named keys.',
+                description: 'REQUIRED for any chart, graph, timeline, or visualization request. Creates a visual line/bar/area chart widget. Call with: title (string) and data (array of objects like [{Year: 2019, Value: 10}, {Year: 2020, Value: 25}]). DO NOT use generate_table for chart requests.',
                 parameters: z.object({
-                    title: z.string().optional(),
-                    data: z.any(),
+                    title: z.string().describe('Title of the chart'),
+                    data: z.any().describe('Array of objects with x-axis key and numeric y-axis values'),
                 }).passthrough(), // Allow any additional parameters
                 execute: async (params: any) => {
                     try {
@@ -739,22 +774,27 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
         };
 
         const activeTools: any = {};
+
+        // Tier 1: Presentation tools (ALWAYS available)
+        activeTools.generate_chart = tools.generate_chart;
+        activeTools.generate_table = tools.generate_table;
+        activeTools.calculate = tools.calculate;
+        activeTools.search_media = tools.search_media;
+
+        // Tier 2: Search tools (source-gated)
         if (sources.includes('web')) activeTools.web_search = tools.web_search;
         if (sources.includes('academic')) activeTools.academic_search = tools.academic_search;
         if (sources.includes('discussions')) activeTools.social_search = tools.social_search;
 
+        // Tier 2: Live data tools (search-gated)
         if (useSearch) {
             activeTools.scrape_url = tools.scrape_url;
-            activeTools.calculate = tools.calculate;
             activeTools.get_weather = tools.get_weather;
             activeTools.get_stock_info = tools.get_stock_info;
             activeTools.get_latest_news = tools.get_latest_news;
-            activeTools.generate_table = tools.generate_table;
-            activeTools.generate_chart = tools.generate_chart;
-            activeTools.search_media = tools.search_media;
         }
 
-        // Add document creation tool when in a space
+        // Tier 3: Persistence tools (space-gated)
         if (spaceId) {
             activeTools.create_document = tools.create_document;
         }
@@ -793,8 +833,12 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                 }
 
                 // Build the enhanced message with search context
+                // Issue 3 fix: Prevent duplicate search calls in PASS 1
+                const searchGuard = searchContext
+                    ? '\n\n[SYSTEM NOTE: Web search has already been performed. DO NOT call web_search again unless explicitly required.]'
+                    : '';
                 const enhancedMessage = searchContext
-                    ? `${message.content}\n\n---\n${searchContext}`
+                    ? `${message.content}\n\n---\n${searchContext}${searchGuard}`
                     : message.content;
 
                 // ===== PASS 1: Tool execution (NON-STREAMING) =====
@@ -833,13 +877,22 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                             }
                         }
 
-                        // If the model generated text during tool execution, we can use it
-                        // But we'll still do PASS 2 for proper streaming
-                        if (toolResult.text && toolResult.text.length > 0) {
-                            toolContext = `\n\n<tool_results>\nThe following tools were executed and their results are displayed as widgets:\n${toolResult.text.slice(0, 500)}\n</tool_results>`;
-                            console.log(`[ai-chat-v2] PASS 1 complete. Tool text length: ${toolResult.text.length}`);
+                        // Issue 3 fix: Don't leak PASS 1 text - use explicit instruction only
+                        // Widgets are already rendered, just tell model to describe them
+                        if (toolResult.steps?.some((s: any) => s.toolCalls?.length > 0)) {
+                            // Get list of tools that were called
+                            const toolsCalled = toolResult.steps
+                                ?.flatMap((s: any) => s.toolCalls?.map((tc: any) => tc.toolName) || [])
+                                .filter(Boolean) || [];
+
+                            toolContext = `\n\n[SYSTEM: The following tools were SUCCESSFULLY executed and their outputs are NOW VISIBLE above: ${toolsCalled.join(', ')}]
+[IMPORTANT: The chart/table/widget IS displayed above. DO NOT say "no chart was generated" or "I was unable to generate". The visualization exists and is visible to the user.]
+[YOUR TASK: Simply describe and interpret what the chart shows. Do not output tool calls as text.]`;
+                            console.log(`[ai-chat-v2] PASS 1 complete. Tools were called: ${toolsCalled.join(', ')}`);
+                        } else if (toolResult.text && toolResult.text.length > 0) {
+                            console.log(`[ai-chat-v2] PASS 1 complete. Text generated but no tool calls.`);
                         } else {
-                            console.log(`[ai-chat-v2] PASS 1 complete. No text generated (tools may have been called).`);
+                            console.log(`[ai-chat-v2] PASS 1 complete. No text or tool calls.`);
                         }
                     } catch (toolErr) {
                         console.error('[ai-chat-v2] PASS 1 tool execution error:', toolErr);
@@ -850,9 +903,9 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                 // ===== PASS 2: Streaming answer (NO TOOLS) =====
                 console.log(`[ai-chat-v2] PASS 2: Streaming final response`);
 
-                // Build final message with both search and tool context
+                // Issue 4 fix: Use specific instruction for PASS 2
                 const finalMessage = toolContext
-                    ? `${enhancedMessage}\n\n${toolContext}\n\nNow provide a comprehensive response based on the search results and tool outputs above.`
+                    ? `${enhancedMessage}\n\n${toolContext}\n\nThe visualization is now displayed above. Describe what it shows and provide insights. Do NOT claim "no chart was generated" - it exists and is visible.`
                     : enhancedMessage;
 
                 const result = streamText({
@@ -959,8 +1012,8 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                         messages: [...formattedHistory, { role: 'user', content: message.content }],
                     };
 
-                    // Add tools and maxSteps when in a space
-                    if (spaceId && Object.keys(activeTools).length > 0) {
+                    // Enable tools in non-search path (Tier-1 presentation tools are always available)
+                    if (Object.keys(activeTools).length > 0) {
                         chatOptions.tools = activeTools;
                         chatOptions.maxSteps = 3; // Allow up to 3 tool calls
                     }
