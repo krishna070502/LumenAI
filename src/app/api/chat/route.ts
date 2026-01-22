@@ -54,6 +54,7 @@ const bodySchema = z.object({
   chatModel: chatModelSchema,
   embeddingModel: embeddingModelSchema,
   systemInstructions: z.string().nullable().optional().default(''),
+  temporaryChat: z.boolean().optional().default(false),
 });
 
 type Body = z.infer<typeof bodySchema>;
@@ -277,14 +278,19 @@ export const POST = async (req: Request) => {
       },
     });
 
-    ensureChatExists({
-      id: body.message.chatId,
-      userId: user.id,
-      sources: body.sources as SearchSources[],
-      fileIds: body.files,
-      query: body.message.content,
-      chatMode: 'research',
-    });
+    // Skip saving chat if temporary mode is enabled
+    if (!body.temporaryChat) {
+      ensureChatExists({
+        id: body.message.chatId,
+        userId: user.id,
+        sources: body.sources as SearchSources[],
+        fileIds: body.files,
+        query: body.message.content,
+        chatMode: 'research',
+      });
+    } else {
+      console.log(`[research] Temporary chat mode - skipping chat save`);
+    }
 
     req.signal.addEventListener('abort', () => {
       disconnect();

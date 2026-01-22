@@ -50,6 +50,8 @@ type ChatContext = {
   title: string;
   spaceSystemPrompt: string | null;
   spaceId: string | null;
+  isTemporaryChat: boolean;
+  setIsTemporaryChat: (isTemporary: boolean) => void;
   setResearchEnded: (ended: boolean) => void;
   setOptimizationMode: (mode: string) => void;
   setChatMode: (mode: 'chat' | 'research') => void;
@@ -276,6 +278,8 @@ export const chatContext = createContext<ChatContext>({
   title: '',
   spaceSystemPrompt: null,
   spaceId: null,
+  isTemporaryChat: false,
+  setIsTemporaryChat: () => { },
   rewrite: () => { },
   sendMessage: async () => { },
   setFileIds: () => { },
@@ -334,6 +338,7 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
   const [isConfigReady, setIsConfigReady] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [isTemporaryChat, setIsTemporaryChat] = useState(false);
 
   // Update default sources based on chat mode
   // Research mode: always enable web search by default
@@ -797,8 +802,9 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
           providerId: embeddingModelProvider.providerId,
         },
         systemInstructions: spaceSystemPrompt || localStorage.getItem('systemInstructions'),
-        memoryEnabled: localStorage.getItem('memoryEnabled') !== 'false',
+        memoryEnabled: isTemporaryChat ? false : localStorage.getItem('memoryEnabled') !== 'false',
         spaceId: spaceId,
+        temporaryChat: isTemporaryChat,
       }),
     });
 
@@ -879,6 +885,8 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
         title,
         spaceSystemPrompt,
         spaceId,
+        isTemporaryChat,
+        setIsTemporaryChat,
         setResearchEnded,
         setOptimizationMode,
         setChatMode,

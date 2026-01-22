@@ -182,10 +182,15 @@ export async function POST(req: Request) {
         if (!user) return Response.json({ message: 'Unauthorized' }, { status: 401 });
 
         const body = await req.json();
-        const { message, history, chatId, messageId, systemInstructions, sources = [], optimizationMode = 'balanced', chatMode = 'chat', memoryEnabled = true, files = [], spaceId = null } = body;
+        const { message, history, chatId, messageId, systemInstructions, sources = [], optimizationMode = 'balanced', chatMode = 'chat', memoryEnabled = true, files = [], spaceId = null, temporaryChat = false } = body;
         if (!message?.content) return Response.json({ message: 'No content' }, { status: 400 });
 
-        await ensureChatExists({ id: chatId, userId: user.id, query: message.content, chatMode, spaceId });
+        // Skip saving chat if temporary mode is enabled
+        if (!temporaryChat) {
+            await ensureChatExists({ id: chatId, userId: user.id, query: message.content, chatMode, spaceId });
+        } else {
+            console.log(`[ai-chat-v2] Temporary chat mode - skipping chat save for ${chatId}`);
+        }
 
         // Retrieve Document Context from uploaded files
         let documentContext = '';
@@ -264,8 +269,13 @@ export async function POST(req: Request) {
             }
         }
 
-        if (!(await db.query.messages.findFirst({ where: eq(messages.messageId, messageId) }))) {
-            await db.insert(messages).values({ chatId, messageId, userId: user.id, backendId: messageId, query: message.content, createdAt: new Date(), status: 'answering', responseBlocks: [] });
+        // Skip saving message if temporary mode is enabled
+        if (!temporaryChat) {
+            if (!(await db.query.messages.findFirst({ where: eq(messages.messageId, messageId) }))) {
+                await db.insert(messages).values({ chatId, messageId, userId: user.id, backendId: messageId, query: message.content, createdAt: new Date(), status: 'answering', responseBlocks: [] });
+            }
+        } else {
+            console.log(`[ai-chat-v2] Temporary chat mode - skipping message save for ${messageId}`);
         }
 
         const formattedHistory = (history || []).map(([role, content]: [string, string]) => ({ role: role === 'human' ? 'user' : 'assistant', content }));
