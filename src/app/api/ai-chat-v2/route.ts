@@ -331,6 +331,18 @@ Answer "NO" if the query:
 
         const systemPrompt = `You are LumenAI, an intelligent AI assistant designed to enlighten and empower users. Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
 
+CRITICAL TOOL INSTRUCTIONS:
+- You have access to tools that are called automatically through function calling
+- DO NOT write code or pseudo-code to call tools
+- DO NOT output "import generate_chart" or "generate_chart(...)" as text
+- Simply decide to use a tool and it will be executed automatically
+- When you want to generate a chart, just invoke the generate_chart function directly
+
+If the user requests a chart, graph, visualization, or trends:
+→ Call the generate_chart tool with proper data
+→ The chart will render as a widget automatically
+→ Then describe what the chart shows
+
 YOUR IDENTITY (IMPORTANT):
 - Your name is **LumenAI** (pronounced "Lumen-AI")
 - When asked "what is your name?" or "who are you?", ALWAYS respond that you are "LumenAI"
@@ -359,12 +371,18 @@ ${modeInstructions}
 ${useSearch ? `SEARCH & TOOLS:
 You have access to: ${availableCapabilities.join(', ')}.
 
-IMPORTANT - USE YOUR TOOLS:
-- When asked to create a chart, timeline, or visualization → USE the generate_chart tool
-- When asked to compare data, show specifications, or list items → USE the generate_table tool  
-- When asked about weather → USE the get_weather tool
-- When asked about stocks → USE the get_stock_info tool
-- When asked to calculate → USE the calculate tool
+HOW TO USE TOOLS:
+- Tools are called automatically through function calling - DO NOT WRITE CODE
+- When asked to create a chart → call generate_chart with title and data array
+- When asked to compare data → call generate_table with headers and rows
+- When asked about weather → call get_weather with location
+- When asked about stocks → call get_stock_info with symbol
+- When asked to calculate → call calculate with expression
+
+EXAMPLE - For a chart request:
+User: "Show me AI growth from 2020-2024"
+You should: Call generate_chart({ title: "AI Growth", data: [{Year: 2020, Growth: 10}, {Year: 2021, Growth: 25}, ...] })
+NOT: Write code like "import generate_chart" or "generate_chart(...)"
 
 When search results are provided:
 - Synthesize information into a clear, well-structured response
@@ -473,8 +491,21 @@ Remember: Make your responses visually appealing and easy to scan. Be helpful, b
             },
             scrape_url: {
                 description: 'Extract and read the full content of specific URLs.',
-                parameters: z.object({ urls: z.array(z.string()).min(1).max(3).describe('An array of URLs to scrape.') }),
-                execute: async ({ urls }: { urls: string[] }) => {
+                parameters: z.object({
+                    url: z.string().optional().describe('A single URL to scrape.'),
+                    urls: z.array(z.string()).optional().describe('An array of URLs to scrape.')
+                }),
+                execute: async (params: { url?: string; urls?: string[] }) => {
+                    // Normalize: accept either 'url' (string) or 'urls' (array)
+                    let urls: string[] = [];
+                    if (params.urls && Array.isArray(params.urls)) {
+                        urls = params.urls;
+                    } else if (params.url) {
+                        urls = [params.url];
+                    }
+                    if (urls.length === 0) {
+                        return { error: 'No URLs provided' };
+                    }
                     const block: any = getOrCreateResearchBlock();
                     const stepId = globalThis.crypto.randomUUID().slice(0, 14);
                     block.data.subSteps.push({ id: stepId, type: 'reading', reading: urls.map(url => ({ content: '', metadata: { url, title: url } })) });
@@ -728,10 +759,13 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
             activeTools.create_document = tools.create_document;
         }
 
-        // Simplified Search Flow: Pre-execute search then stream response with results
+        // TWO-PASS ARCHITECTURE for Search + Tools + Streaming
+        // PASS 1: generateText() with tools (non-streaming) - executes charts, tables, weather, etc.
+        // PASS 2: streamText() without tools (streaming) - generates the final answer
         const runWithSearch = async () => {
             let fullText = '';
             let searchContext = '';
+            let toolContext = '';
 
             try {
                 // Execute search if: explicit sources selected OR auto-classification determined search is needed
@@ -758,38 +792,74 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                     }
                 }
 
-                // Stream the final response with search context injected
+                // Build the enhanced message with search context
                 const enhancedMessage = searchContext
                     ? `${message.content}\n\n---\n${searchContext}`
                     : message.content;
 
-                // Build chat options with tools when available
-                const searchChatOptions: any = {
-                    model: nim.chatModel('meta/llama-3.1-405b-instruct'),
-                    system: systemPrompt,
-                    messages: [...formattedHistory, { role: 'user', content: enhancedMessage }],
-                    onStepFinish: (step: any) => {
-                        console.log('[ai-chat-v2] Step finished:', JSON.stringify({
-                            stepType: step.stepType,
-                            toolCalls: step.toolCalls?.length,
-                            toolResults: step.toolResults?.length,
-                            isContinued: step.isContinued,
-                        }));
-                        if (step.toolResults) {
-                            step.toolResults.forEach((result: any) => {
-                                console.log('[ai-chat-v2] Tool result details:', result.toolName, result.result);
-                            });
-                        }
-                    },
-                };
-
-                // Add tools when we have active tools
+                // ===== PASS 1: Tool execution (NON-STREAMING) =====
+                // This allows charts, tables, weather, stocks, calculator to work
                 if (Object.keys(activeTools).length > 0) {
-                    searchChatOptions.tools = activeTools;
-                    searchChatOptions.maxSteps = 5; // Allow multiple tool calls
+                    console.log(`[ai-chat-v2] PASS 1: Executing tools (${Object.keys(activeTools).join(', ')})`);
+
+                    try {
+                        const toolResult = await generateText({
+                            model: nim.chatModel('meta/llama-3.1-405b-instruct'),
+                            system: systemPrompt,
+                            messages: [...formattedHistory, { role: 'user', content: enhancedMessage }],
+                            tools: activeTools,
+                            maxSteps: 5,
+                        } as any);
+
+                        // Detailed logging for debugging
+                        console.log(`[ai-chat-v2] PASS 1 Result:`, {
+                            finishReason: toolResult.finishReason,
+                            stepsCount: toolResult.steps?.length || 0,
+                            textLength: toolResult.text?.length || 0,
+                            hasToolCalls: toolResult.steps?.some((s: any) => s.toolCalls?.length > 0) || false,
+                        });
+
+                        // Log tool usage
+                        if (toolResult.steps && toolResult.steps.length > 0) {
+                            for (const step of toolResult.steps) {
+                                console.log(`[ai-chat-v2] Step:`, {
+                                    stepType: (step as any).stepType,
+                                    toolCallsCount: step.toolCalls?.length || 0,
+                                    toolResultsCount: step.toolResults?.length || 0,
+                                });
+                                if (step.toolCalls && step.toolCalls.length > 0) {
+                                    console.log(`[ai-chat-v2] Tool calls executed:`, step.toolCalls.map((tc: any) => tc.toolName));
+                                }
+                            }
+                        }
+
+                        // If the model generated text during tool execution, we can use it
+                        // But we'll still do PASS 2 for proper streaming
+                        if (toolResult.text && toolResult.text.length > 0) {
+                            toolContext = `\n\n<tool_results>\nThe following tools were executed and their results are displayed as widgets:\n${toolResult.text.slice(0, 500)}\n</tool_results>`;
+                            console.log(`[ai-chat-v2] PASS 1 complete. Tool text length: ${toolResult.text.length}`);
+                        } else {
+                            console.log(`[ai-chat-v2] PASS 1 complete. No text generated (tools may have been called).`);
+                        }
+                    } catch (toolErr) {
+                        console.error('[ai-chat-v2] PASS 1 tool execution error:', toolErr);
+                        // Continue to PASS 2 even if tools fail
+                    }
                 }
 
-                const result = streamText(searchChatOptions);
+                // ===== PASS 2: Streaming answer (NO TOOLS) =====
+                console.log(`[ai-chat-v2] PASS 2: Streaming final response`);
+
+                // Build final message with both search and tool context
+                const finalMessage = toolContext
+                    ? `${enhancedMessage}\n\n${toolContext}\n\nNow provide a comprehensive response based on the search results and tool outputs above.`
+                    : enhancedMessage;
+
+                const result = streamText({
+                    model: nim.chatModel('meta/llama-3.1-405b-instruct'),
+                    system: systemPrompt,
+                    messages: [...formattedHistory, { role: 'user', content: finalMessage }],
+                });
 
                 let textBlockId = '';
                 let lastUpdateTime = 0;
@@ -797,19 +867,21 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                 const UPDATE_INTERVAL_MS = 100;
                 const UPDATE_CHAR_THRESHOLD = 50;
 
+                // Single-pass streaming - emit blocks immediately as text comes in
                 for await (const part of result.fullStream) {
                     if (part.type === 'text-delta') {
-                        const textDelta = (part as any).text || '';
+                        const textDelta = (part as any).textDelta ?? (part as any).text ?? '';
                         fullText += textDelta;
 
                         if (!textBlockId) {
+                            // Create and emit the first text block immediately
                             const block = { id: globalThis.crypto.randomUUID().slice(0, 14), type: 'text' as const, data: fullText };
                             textBlockId = block.id;
                             session.emitBlock(block);
                             lastUpdateTime = Date.now();
                             lastUpdateLength = fullText.length;
                         } else {
-                            // Throttle updates: only update if enough time or characters have passed
+                            // Throttled updates to avoid overwhelming the client
                             const now = Date.now();
                             const charsSinceUpdate = fullText.length - lastUpdateLength;
                             if (now - lastUpdateTime >= UPDATE_INTERVAL_MS || charsSinceUpdate >= UPDATE_CHAR_THRESHOLD) {
@@ -818,17 +890,19 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                                 lastUpdateLength = fullText.length;
                             }
                         }
-                    } else if (part.type === 'tool-call') {
-                        console.log(`[ai-chat-v2] Tool call in search flow: ${part.toolName}`, (part as any).input || (part as any).args);
-                    } else if (part.type === 'tool-result') {
-                        console.log(`[ai-chat-v2] Tool result in search flow for ${part.toolName}:`, (part as any).output || (part as any).result);
+                    } else if (part.type === 'finish') {
+                        console.log(`[ai-chat-v2] Stream finished:`, (part as any).finishReason);
+                    } else if (part.type === 'error') {
+                        console.error(`[ai-chat-v2] Stream error:`, (part as any).error);
                     }
                 }
+
                 // Final update to ensure all text is captured
                 if (textBlockId) {
                     session.updateBlock(textBlockId, [{ op: 'replace', path: '/data', value: fullText }]);
                 }
-                console.log(`[ai-chat-v2] Stream complete. Text length:`, fullText.length);
+
+                console.log(`[ai-chat-v2] PASS 2 complete. Text length:`, fullText.length);
             } catch (err) {
                 console.error('[ai-chat-v2] Error in runWithSearch:', err);
                 session.emit('error', { message: 'Search/response error' });
