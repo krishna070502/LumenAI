@@ -339,118 +339,61 @@ Answer "NO" if the query:
         if (useSearch) availableCapabilities.push('Tools (Weather, Stocks, Calculator, Tables, Charts, Media Search)');
         if (spaceId) availableCapabilities.push('Document Creation (create new documents with generated content)');
 
-        const systemPrompt = `You are LumenAI, an intelligent AI assistant designed to enlighten and empower users. Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
-
-CRITICAL TOOL INSTRUCTIONS:
-- You have access to tools that are called automatically through function calling
-- DO NOT write code or pseudo-code to call tools
-- DO NOT output "import generate_chart" or "generate_chart(...)" as text
-- Simply decide to use a tool and it will be executed automatically
-- When you want to generate a chart, just invoke the generate_chart function directly
-
-NON-NEGOTIABLE TOOL RULE:
-If the user asks for:
-- a chart
-- a graph
-- a visualization
-- trends over time
-- comparisons over time
-- evolution over time
-
-You MUST call the generate_chart tool with NUMERIC data.
-FORBIDDEN RESPONSES:
-- Using generate_table instead of generate_chart (tables are NOT charts)
-- Text-only explanations describing what a chart "would look like"
-- Claiming you "cannot" or "were unable to" generate a chart
-- Markdown tables as substitutes for visual charts
-- Passing text/string values instead of numbers
-
-DATA FORMAT REQUIREMENTS:
-→ X-axis: Years, dates, or categories (strings are OK for x-axis)
-→ Y-axis: MUST be numeric values (integers or decimals)
-→ For qualitative concepts (like "AI evolution"), assign a numeric score (1-10 scale)
-
-EXAMPLE for "AI evolution chart 2019-2025":
-generate_chart({
-  title: "AI Evolution Score 2019-2025",
-  data: [
-    {Year: 2019, Score: 3},
-    {Year: 2020, Score: 5},
-    {Year: 2021, Score: 6},
-    {Year: 2022, Score: 7},
-    {Year: 2023, Score: 8},
-    {Year: 2024, Score: 9},
-    {Year: 2025, Score: 10}
-  ]
-})
-
-REQUIRED ACTION:
-→ Call generate_chart with proper numeric data
-→ The chart will render as a visual widget automatically
-→ Then briefly describe what the chart shows
-
-YOUR IDENTITY (IMPORTANT):
-- Your name is **LumenAI** (pronounced "Lumen-AI")
-- When asked "what is your name?" or "who are you?", ALWAYS respond that you are "LumenAI"
-- Your tagline is "Enlighten Yourself"
-- Never claim to be a different AI or use a different name
+        const coreIdentity = `You are LumenAI, an intelligent AI assistant. Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
+Your name is **LumenAI**. Your tagline is "Enlighten Yourself".
 
 PERSONALITY & TONE:
-- Be warm, conversational, and approachable - like chatting with a helpful friend who happens to be an expert
-- Use natural language, not stiff or formal phrasing
-- Show genuine interest in helping the user
-- Use contractions (I'm, you're, don't) to sound natural
-- Be encouraging and positive without being over-the-top
+- Be warm, conversational, and approachable. Show genuine interest in helping the user.
+- Use natural language and contractions (I'm, you're).
+- Provide helpful, accurate, and scannable responses.
 
-FORMATTING GUIDELINES:
-- Use emojis strategically to add visual interest (📌 ✅ 🔌 💡 🎯 etc.) - but don't overdo it
-- Use **bold** for emphasis on key points
-- Use bullet points for lists
-- Add helpful section headers when the response has multiple parts
-- End with an engaging follow-up question or offer to help further when appropriate
-- Keep responses scannable - users should be able to quickly find what they need
+FORMATTING:
+- Use **bold** for emphasis. Use emojis strategically (📌 ✅ 💡).
+- Use bullet points and headers for structure.`;
 
-RESPONSE STYLE (${optimizationMode} mode):
-${modeInstructions}
+        const toolGuidelines = `VISUALIZATION & TOOLS:
+- You have access to tools for charts, formatting, and search.
+- Use tools as optional supplements only when requested or if numeric data is central.
+- SILENCE RULE: Do not explain why you are NOT using a tool. If a tool isn't right, respond with text only.
+- Tools are called automatically; do not write code or pseudocode to call them.`;
 
-${useSearch ? `SEARCH & TOOLS:
+        const searchAndSpace = `${useSearch ? `SEARCH CAPABILITIES:
 You have access to: ${availableCapabilities.join(', ')}.
+When search results are provided, synthesize them into a clear response and cite sources naturally.` : ''}
+${spaceId ? 'You can create documents using the create_document tool if requested.' : ''}`;
 
-HOW TO USE TOOLS:
-- Tools are called automatically through function calling - DO NOT WRITE CODE
-- When asked to create a chart → call generate_chart with title and data array
-- When asked to compare data → call generate_table with headers and rows
-- When asked about weather → call get_weather with location
-- When asked about stocks → call get_stock_info with symbol
-- When asked to calculate → call calculate with expression
+        const contextAndPrefs = `${systemInstructions ? `USER PREFERENCES: ${systemInstructions}` : ''}
+${retrievedMemories.length > 0 ? `USER CONTEXT:
+${retrievedMemories.map(m => `- ${m.content}`).join('\n')}` : ''}
+${documentContext ? `ATTACHED DOCUMENTS:\n${documentContext}` : ''}`;
 
-EXAMPLE - For a chart request:
-User: "Show me AI growth from 2020-2024"
-You should: Call generate_chart({ title: "AI Growth", data: [{Year: 2020, Growth: 10}, {Year: 2021, Growth: 25}, ...] })
-NOT: Write code like "import generate_chart" or "generate_chart(...)"
+        // Base system prompt (Identity + Tone + Context)
+        const baseSystemPrompt = `${coreIdentity}
 
-When search results are provided:
-- Synthesize information into a clear, well-structured response
-- Cite sources naturally (not robotically)
-- Note when information might change frequently
-` : `REASONING:
-For complex questions, think through the problem step by step. You may use <think></think> tags at the START of your response for internal reasoning, then provide a clear answer after.
-`}
-${spaceId ? `DOCUMENT CREATION:
-You can create new documents within this space when the user asks. When a user requests to create a document:
-- Use the create_document tool with an appropriate title and topic
-- After creating, confirm success and let them know they can click the link to view it
-- Examples of when to create: "create a document about...", "write a document on...", "generate a document for...", "make a document explaining..."
-` : ''}
-${systemInstructions ? `USER PREFERENCES: ${systemInstructions}` : ''}
+${contextAndPrefs}
 
-${retrievedMemories.length > 0 ? `IMPORTANT - WHAT YOU KNOW ABOUT THIS USER:
-You have established context with this user from previous conversations. Use this information naturally - don't mention that you "remember" from past chats or that you have "memory." Just naturally incorporate what you know as if you've always known it.
-<user_context>
-${retrievedMemories.map(m => `- ${m.content}`).join('\n')}
-</user_context>` : ''}
-${documentContext}
-Remember: Make your responses visually appealing and easy to scan. Be helpful, be human, be you! Never say things like "we're starting fresh" or "blank slate" - if you have context about the user, use it naturally.${documentContext ? ' When the user asks about attached documents, summarize, analyze, or answer based on the document content provided above.' : ''}`;
+Remember: Be helpful, be human, be you!`;
+
+        // Pass 1: Full Capability
+        const pass1SystemPrompt = `${baseSystemPrompt}
+
+PRIMARY OBJECTIVE: Be a helpful, conversational assistant. You may use tools if needed to provide a better answer, but your main output is natural text.
+
+${toolGuidelines}
+
+${searchAndSpace}`;
+
+        // Pass 2: Natural Synthesis
+        const pass2SystemPrompt = `${coreIdentity}
+
+PRIMARY OBJECTIVE: You are now generating the final response. 
+- Provide a clear, comprehensive, and natural text response to the user.
+- ${useSearch ? 'Synthesize the search results and tool outputs provided into your answer.' : 'Directly answer the user\'s query based on your knowledge.'}
+- DO NOT mention tools, function calls, or internal search steps.
+- DO NOT explain why you didn't use a tool.
+- **NO GENERIC FOOTERS**: Avoid appending standard disclaimers like "Not financial advice" or "Informational purposes only" unless the content is strictly about finance/stocks.
+
+${contextAndPrefs}`;
 
         const session = new SessionManager(messageId);
         (SessionManager as any).sessions.set(messageId, session);
@@ -675,7 +618,7 @@ Remember: Make your responses visually appealing and easy to scan. Be helpful, b
                 }
             },
             search_media: {
-                description: 'Search for high-quality images or videos related to a topic.',
+                description: 'Search for high-quality images or videos related to a topic. Use this when the user specifically asks for visuals, pictures, or videos.',
                 parameters: z.object({ query: z.string(), type: z.enum(['images', 'videos']) }),
                 execute: async ({ query, type }: { query: string, type: 'images' | 'videos' }) => {
                     session.emit('mediaSearch', { query, type });
@@ -859,7 +802,7 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                     try {
                         const toolResult = await generateText({
                             model: nim.chatModel('meta/llama-3.1-405b-instruct'),
-                            system: systemPrompt,
+                            system: pass1SystemPrompt,
                             messages: [...formattedHistory, { role: 'user', content: enhancedMessage }],
                             tools: activeTools,
                             maxSteps: 5,
@@ -887,22 +830,26 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                             }
                         }
 
-                        // Issue 3 fix: Don't leak PASS 1 text - use explicit instruction only
-                        // Widgets are already rendered, just tell model to describe them
-                        if (toolResult.steps?.some((s: any) => s.toolCalls?.length > 0)) {
-                            // Get list of tools that were called
-                            const toolsCalled = toolResult.steps
-                                ?.flatMap((s: any) => s.toolCalls?.map((tc: any) => tc.toolName) || [])
-                                .filter(Boolean) || [];
+                        // Issue 3 fix: Refined Pass 2 context
+                        const toolsCalled = toolResult.steps
+                            ?.flatMap((s: any) => s.toolCalls?.map((tc: any) => tc.toolName) || [])
+                            .filter(Boolean) || [];
 
-                            toolContext = `\n\n[SYSTEM: The following tools were SUCCESSFULLY executed and their outputs are NOW VISIBLE above: ${toolsCalled.join(', ')}]
-[IMPORTANT: The chart/table/widget IS displayed above. DO NOT say "no chart was generated" or "I was unable to generate". The visualization exists and is visible to the user.]
-[YOUR TASK: Simply describe and interpret what the chart shows. Do not output tool calls as text.]`;
-                            console.log(`[ai-chat-v2] PASS 1 complete. Tools were called: ${toolsCalled.join(', ')}`);
-                        } else if (toolResult.text && toolResult.text.length > 0) {
-                            console.log(`[ai-chat-v2] PASS 1 complete. Text generated but no tool calls.`);
+                        const hasVisualTools = toolsCalled.some(t => ['generate_chart', 'generate_table'].includes(t));
+                        const pass1Text = toolResult.text ? `\n\n[PREVIOUS ANALYSIS: ${toolResult.text}]` : '';
+
+                        if (hasVisualTools) {
+                            toolContext = `${pass1Text}\n\n[SYSTEM: The following visual tools were SUCCESSFULLY executed and are NOW VISIBLE above: ${toolsCalled.join(', ')}]
+[IMPORTANT: The visualization exists and is visible. Describe it briefly and interpret the data for the user.]`;
+                            console.log(`[ai-chat-v2] PASS 1 complete. Visual tools: ${toolsCalled.join(', ')}`);
+                        } else if (toolsCalled.length > 0) {
+                            toolContext = `${pass1Text}\n\n[SYSTEM: You initiated these UI actions: ${toolsCalled.join(', ')}. Acknowledge this naturally in your response.]`;
+                            console.log(`[ai-chat-v2] PASS 1 complete. UI tools: ${toolsCalled.join(', ')}`);
+                        } else if (toolResult.text) {
+                            toolContext = pass1Text;
+                            console.log(`[ai-chat-v2] PASS 1 complete. Text generated.`);
                         } else {
-                            console.log(`[ai-chat-v2] PASS 1 complete. No text or tool calls.`);
+                            console.log(`[ai-chat-v2] PASS 1 complete. No results.`);
                         }
                     } catch (toolErr) {
                         console.error('[ai-chat-v2] PASS 1 tool execution error:', toolErr);
@@ -913,14 +860,14 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                 // ===== PASS 2: Streaming answer (NO TOOLS) =====
                 console.log(`[ai-chat-v2] PASS 2: Streaming final response`);
 
-                // Issue 4 fix: Use specific instruction for PASS 2
+                // Refined Pass 2 Logic: Only add toolContext if visual tools were called
                 const finalMessage = toolContext
-                    ? `${enhancedMessage}\n\n${toolContext}\n\nThe visualization is now displayed above. Describe what it shows and provide insights. Do NOT claim "no chart was generated" - it exists and is visible.`
-                    : enhancedMessage;
+                    ? `${enhancedMessage}\n\n${toolContext}`
+                    : `${enhancedMessage}\n\n[SYSTEM NOTE: No charts were requested or needed. Provide a direct text response. Do not mention charts, tables, or search steps in your output.]`;
 
                 const result = streamText({
                     model: nim.chatModel('meta/llama-3.1-405b-instruct'),
-                    system: systemPrompt,
+                    system: pass2SystemPrompt,
                     messages: [...formattedHistory, { role: 'user', content: finalMessage }],
                 });
 
@@ -1009,99 +956,8 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
             }
         };
 
-        if (useSearch) {
-            runWithSearch();
-        } else {
-            (async () => {
-                let fullText = '';
-                try {
-                    // Include tools when in a space (for document creation)
-                    const chatOptions: any = {
-                        model: nim.chatModel('meta/llama-3.1-405b-instruct'),
-                        system: systemPrompt,
-                        messages: [...formattedHistory, { role: 'user', content: message.content }],
-                    };
-
-                    // Enable tools in non-search path (Tier-1 presentation tools are always available)
-                    if (Object.keys(activeTools).length > 0) {
-                        chatOptions.tools = activeTools;
-                        chatOptions.maxSteps = 3; // Allow up to 3 tool calls
-                    }
-
-                    const result = streamText(chatOptions);
-
-                    let textBlockId = '';
-                    let lastUpdateTime = 0;
-                    let lastUpdateLength = 0;
-                    const UPDATE_INTERVAL_MS = 100;
-                    const UPDATE_CHAR_THRESHOLD = 50;
-
-                    for await (const part of result.fullStream) {
-                        if (part.type === 'text-delta') {
-                            const textDelta = (part as any).text || '';
-                            fullText += textDelta;
-
-                            if (!textBlockId) {
-                                const block = { id: globalThis.crypto.randomUUID().slice(0, 14), type: 'text' as const, data: fullText };
-                                textBlockId = block.id;
-                                session.emitBlock(block);
-                                lastUpdateTime = Date.now();
-                                lastUpdateLength = fullText.length;
-                            } else {
-                                // Throttle updates: only update if enough time or characters have passed
-                                const now = Date.now();
-                                const charsSinceUpdate = fullText.length - lastUpdateLength;
-                                if (now - lastUpdateTime >= UPDATE_INTERVAL_MS || charsSinceUpdate >= UPDATE_CHAR_THRESHOLD) {
-                                    session.updateBlock(textBlockId, [{ op: 'replace', path: '/data', value: fullText }]);
-                                    lastUpdateTime = now;
-                                    lastUpdateLength = fullText.length;
-                                }
-                            }
-                        } else if (part.type === 'tool-call') {
-                            console.log(`[ai-chat-v2] Tool call: ${part.toolName}`, (part as any).input || (part as any).args);
-                        } else if (part.type === 'tool-result') {
-                            console.log(`[ai-chat-v2] Tool result for ${part.toolName}:`, (part as any).output || (part as any).result);
-                        }
-                    }
-                    // Final update to ensure all text is captured
-                    if (textBlockId) {
-                        session.updateBlock(textBlockId, [{ op: 'replace', path: '/data', value: fullText }]);
-                    }
-                } catch (err) {
-                    console.error('[ai-chat-v2] Chat error:', err);
-                } finally {
-                    try {
-                        await db.update(messages).set({ status: 'completed', responseBlocks: session.getAllBlocks() }).where(eq(messages.messageId, messageId)).execute();
-                        if (formattedHistory.length === 0 && fullText.length > 0) {
-                            generateChatTitle(message.content, fullText).then(async (title) => {
-                                try { await db.update(chats).set({ title }).where(eq(chats.id, chatId)).execute(); } catch (e) { }
-                            });
-                        }
-                    } catch (e) { }
-
-                    // Extract new memories
-                    if (memoryManager && (formattedHistory.length / 2) % 5 === 0) {
-                        const conversationSlice = [
-                            ...formattedHistory,
-                            { role: 'user', content: message.content },
-                            { role: 'assistant', content: fullText }
-                        ] as any;
-
-                        MemoryManager.extractMemories(nim.chatModel('meta/llama-3.1-405b-instruct'), conversationSlice)
-                            .then(async (extracted) => {
-                                for (const mem of extracted) {
-                                    await memoryManager?.saveMemory(user.id, mem);
-                                }
-                            })
-                            .catch(err => console.error('[ai-chat-v2] Memory extraction failed:', err));
-                    }
-
-                    session.emit('messageEnd', {});
-                    if (disconnect) disconnect();
-                    writer.close();
-                }
-            })();
-        }
+        // Execute the main processing loop
+        await runWithSearch();
 
         return new Response(responseStream.readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
 

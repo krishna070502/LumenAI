@@ -163,7 +163,7 @@ const MessageBox = ({
           {/* Assistant Header (Icon + Name) */}
           <div className="flex items-center space-x-3 mb-1">
             <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shadow-sm">
-              <img src="/logo-upscaled.png" alt="LumenAI" className="w-full h-full object-cover" />
+              <img src="/logo-upscaled.png" alt="" aria-hidden="true" className="w-full h-full object-cover" />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold text-black/90 dark:text-white/90">
