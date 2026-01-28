@@ -4,6 +4,8 @@ import BaseEmbedding from '../../base/embedding';
 import BaseModelProvider from '../../base/provider';
 import BaseLLM from '../../base/llm';
 import AnthropicLLM from './anthropicLLM';
+import modelListCache from '../../cache';
+import { hashObj } from '@/lib/serverUtils';
 
 interface AnthropicConfig {
   apiKey: string;
@@ -57,16 +59,22 @@ class AnthropicProvider extends BaseModelProvider<AnthropicConfig> {
   }
 
   async getModelList(): Promise<ModelList> {
+    const cacheKey = `anthropic-${hashObj(this.config)}`;
+    const cached = modelListCache.get(cacheKey);
+    if (cached) return cached;
+
     const { getConfiguredModelProviderById } = await import(
       '@/lib/config/serverRegistry'
     );
     const defaultModels = await this.getDefaultModels();
     const configProvider = getConfiguredModelProviderById(this.id)!;
 
-    return {
+    const result = {
       embedding: [],
       chat: [...defaultModels.chat, ...configProvider.chatModels],
     };
+    modelListCache.set(cacheKey, result);
+    return result;
   }
 
   async loadChatModel(key: string): Promise<BaseLLM<any>> {

@@ -4,6 +4,8 @@ import BaseEmbedding from '../../base/embedding';
 import BaseModelProvider from '../../base/provider';
 import BaseLLM from '../../base/llm';
 import OpenAILLM from '../openai/openaiLLM';
+import modelListCache from '../../cache';
+import { hashObj } from '@/lib/serverUtils';
 
 interface XAIConfig {
     apiKey: string;
@@ -70,11 +72,46 @@ class XAIProvider extends BaseModelProvider<XAIConfig> {
     }
 
     async getModelList(): Promise<ModelList> {
+        const cacheKey = `xai-${hashObj(this.config)}`;
+        const cached = modelListCache.get(cacheKey);
+        if (cached) return cached;
+
         const { getConfiguredModelProviderById } = await import(
             '@/lib/config/serverRegistry'
         );
         const defaultModels = await this.getDefaultModels();
         const configProvider = getConfiguredModelProviderById(this.id)!;
+
+        try {
+            const response = await fetch(`${this.config.baseURL}/models`, {
+                headers: {
+                    Authorization: `Bearer ${this.config.apiKey}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const fetchedModels = data.data || [];
+
+                const chat: Model[] = [...defaultModels.chat];
+
+                fetchedModels.forEach((m: any) => {
+                    const id = m.id;
+                    if (!chat.some(existing => existing.key === id)) {
+                        chat.push({ name: id, key: id });
+                    }
+                });
+
+                const result = {
+                    embedding: [...configProvider.embeddingModels],
+                    chat: [...chat, ...configProvider.chatModels],
+                };
+                modelListCache.set(cacheKey, result);
+                return result;
+            }
+        } catch (err) {
+            console.error('Failed to fetch xAI models:', err);
+        }
 
         return {
             embedding: [...configProvider.embeddingModels],

@@ -4,6 +4,8 @@ import BaseEmbedding from '../../base/embedding';
 import BaseModelProvider from '../../base/provider';
 import BaseLLM from '../../base/llm';
 import GroqLLM from './groqLLM';
+import modelListCache from '../../cache';
+import { hashObj } from '@/lib/serverUtils';
 
 interface GroqConfig {
   apiKey: string;
@@ -55,19 +57,26 @@ class GroqProvider extends BaseModelProvider<GroqConfig> {
   }
 
   async getModelList(): Promise<ModelList> {
+    const cacheKey = `groq-${hashObj(this.config)}`;
+    const cached = modelListCache.get(cacheKey);
+    if (cached) return cached;
+
     const { getConfiguredModelProviderById } = await import(
       '@/lib/config/serverRegistry'
     );
     const defaultModels = await this.getDefaultModels();
     const configProvider = getConfiguredModelProviderById(this.id)!;
 
-    return {
+    const result = {
       embedding: [
         ...defaultModels.embedding,
         ...configProvider.embeddingModels,
       ],
       chat: [...defaultModels.chat, ...configProvider.chatModels],
     };
+
+    modelListCache.set(cacheKey, result);
+    return result;
   }
 
   async loadChatModel(key: string): Promise<BaseLLM<any>> {

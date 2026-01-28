@@ -6,12 +6,20 @@ import { MinimalProvider, ModelList } from './types';
 import configManager from '../config';
 
 class ModelRegistry {
+  private static instance: ModelRegistry;
   activeProviders: (ConfigModelProvider & {
     provider: BaseModelProvider<any>;
   })[] = [];
 
-  constructor() {
+  private constructor() {
     this.initializeActiveProviders();
+  }
+
+  public static getInstance(): ModelRegistry {
+    if (!ModelRegistry.instance) {
+      ModelRegistry.instance = new ModelRegistry();
+    }
+    return ModelRegistry.instance;
   }
 
   private initializeActiveProviders() {

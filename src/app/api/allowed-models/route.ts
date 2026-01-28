@@ -19,7 +19,7 @@ export async function GET() {
         console.log(`[allowed-models] allowedChatModels from DB: ${JSON.stringify(allowedModels)}`);
 
         // Use ModelRegistry to get dynamically-fetched providers with model lists
-        const registry = new ModelRegistry();
+        const registry = ModelRegistry.getInstance();
         const activeProviders = await registry.getActiveProviders();
         console.log(`[allowed-models] Active providers: ${activeProviders.length}, names: ${activeProviders.map(p => p.name).join(', ')}`);
 

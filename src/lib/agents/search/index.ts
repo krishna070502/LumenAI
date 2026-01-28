@@ -64,7 +64,7 @@ class SearchAgent {
     // Memory Manager initialization for extraction later
     let memoryManager: MemoryManager | null = null;
     try {
-      const registry = new ModelRegistry();
+      const registry = ModelRegistry.getInstance();
       const providers = await registry.getActiveProviders();
       const embeddingProvider = providers.find((p) => p.embeddingModels.length > 0);
       if (embeddingProvider) {

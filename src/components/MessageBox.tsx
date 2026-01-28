@@ -220,7 +220,9 @@ const MessageBox = ({
                     'max-w-none break-words text-black dark:text-white/90 prose-p:my-4 prose-p:text-[17px]',
                     'prose-li:text-[17px] prose-li:my-1 prose-table:my-6 prose-table:border-collapse',
                     'prose-th:border prose-th:border-light-300 dark:prose-th:border-dark-300 prose-th:px-4 prose-th:py-2 prose-th:bg-light-100 dark:prose-th:bg-dark-100',
-                    'prose-td:border prose-td:border-light-300 dark:prose-td:border-dark-300 prose-td:px-4 prose-td:py-2'
+                    'prose-td:border prose-td:border-light-300 dark:prose-td:border-dark-300 prose-td:px-4 prose-td:py-2',
+                    // Streaming animation classes
+                    isLast && loading && 'prose-streaming streaming-active'
                   )}
                   options={markdownOverrides}
                 >
@@ -408,7 +410,9 @@ const MessageBox = ({
                   className={cn(
                     'prose prose-p:my-1 prose-li:my-0 prose-h1:mb-3 prose-h2:mb-2 prose-h2:mt-6 prose-h2:font-[800] prose-h3:mt-4 prose-h3:mb-1.5 prose-h3:font-[600] dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 font-[400]',
                     'max-w-none break-words text-black dark:text-white',
-                    'prose-li:marker:text-[#24A0ED] prose-blockquote:border-none prose-blockquote:p-0'
+                    'prose-li:marker:text-[#24A0ED] prose-blockquote:border-none prose-blockquote:p-0',
+                    // Streaming animation classes
+                    isLast && loading && 'prose-streaming streaming-active'
                   )}
                   options={markdownOverrides}
                 >

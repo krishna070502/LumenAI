@@ -80,17 +80,33 @@ class SessionManager {
   subscribe(listener: (event: string, data: any) => void): () => void {
     const currentEventsLength = this.events.length;
 
-    const handler = (event: string) => (data: any) => listener(event, data);
-    const dataHandler = handler('data');
-    const endHandler = handler('end');
-    const errorHandler = handler('error');
+    // Generic handler for all event types
+    const eventHandler = (eventType: string) => (data: any) => {
+      console.log(`[SessionManager] Event emitted: ${eventType}`, data);
+      listener(eventType, data);
+    };
+
+    // Register handlers for all possible event types
+    const dataHandler = eventHandler('data');
+    const endHandler = eventHandler('end');
+    const errorHandler = eventHandler('error');
+    const titleHandler = eventHandler('title');
+    const statusHandler = eventHandler('status');
+    const messageEndHandler = eventHandler('messageEnd');
+    const mediaSearchHandler = eventHandler('mediaSearch');
 
     this.emitter.on('data', dataHandler);
     this.emitter.on('end', endHandler);
     this.emitter.on('error', errorHandler);
+    this.emitter.on('title', titleHandler);
+    this.emitter.on('status', statusHandler);
+    this.emitter.on('messageEnd', messageEndHandler);
+    this.emitter.on('mediaSearch', mediaSearchHandler);
 
+    // Replay historical events
     for (let i = 0; i < currentEventsLength; i++) {
       const { event, data } = this.events[i];
+      console.log(`[SessionManager] Replaying event: ${event}`, data);
       listener(event, data);
     }
 
@@ -98,6 +114,10 @@ class SessionManager {
       this.emitter.off('data', dataHandler);
       this.emitter.off('end', endHandler);
       this.emitter.off('error', errorHandler);
+      this.emitter.off('title', titleHandler);
+      this.emitter.off('status', statusHandler);
+      this.emitter.off('messageEnd', messageEndHandler);
+      this.emitter.off('mediaSearch', mediaSearchHandler);
     };
   }
 }

@@ -131,3 +131,68 @@ html.dark .gradient-bg,
     font-size: 16px !important;
   }
 }
+
+/* Streaming Text Animation - Light and smooth */
+@keyframes text-stream-in {
+  0% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes subtle-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* Streaming container with smooth fade-in effect */
+.streaming-text {
+  animation: text-stream-in 0.3s ease-out forwards;
+}
+
+/* Active streaming indicator - subtle pulse on the last character area */
+.streaming-active {
+  position: relative;
+}
+
+.streaming-active::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.8) 0%, rgba(56, 189, 248, 0.6) 100%);
+  margin-left: 2px;
+  border-radius: 1px;
+  animation: cursor-blink 0.8s ease-in-out infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes cursor-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Smooth text appearance for streaming paragraphs */
+.prose-streaming p:last-child,
+.prose-streaming li:last-child,
+.prose-streaming h1:last-child,
+.prose-streaming h2:last-child,
+.prose-streaming h3:last-child {
+  animation: text-stream-in 0.15s ease-out;
+}
+
+/* Word-level streaming effect (for smoother feel) */
+.streaming-word {
+  animation: text-stream-in 0.12s ease-out forwards;
+  display: inline;
+}

@@ -566,6 +566,24 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
         return;
       }
 
+      if (data.type === 'title') {
+        const titleValue = data.title?.trim();
+        console.log(`[useChat] Title event received:`, titleValue);
+        
+        if (titleValue && titleValue !== 'New Conversation') {
+          // Update document title immediately
+          document.title = titleValue;
+          
+          // Update state immediately (force re-render)
+          setTitle(titleValue);
+          
+          console.log(`[useChat] Title updated in state and document.title`);
+        } else {
+          console.warn(`[useChat] Received invalid title:`, titleValue);
+        }
+        return;
+      }
+
       if (data.type === 'researchComplete') {
         setResearchEnded(true);
         if (
@@ -664,21 +682,8 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
         setLoading(false);
         setResearchEnded(true);
 
-        // Fetch updated title after first message (AI title is generated on server)
-        if (chatHistory.current.length === 2) {  // First human + assistant pair
-          setTimeout(async () => {
-            try {
-              const res = await fetch(`/api/chats/${chatId}/title`);
-              if (res.ok) {
-                const { title } = await res.json();
-                if (title) {
-                  document.title = title;
-                  setTitle(title);
-                }
-              }
-            } catch (e) { /* ignore */ }
-          }, 3000); // Wait 3s for title generation
-        }
+        // Title is now handled reliably via the 'title' event emitted at stream start
+        // No fallback needed since optimistic title is emitted immediately
 
         const lastMsg = messagesRef.current[messagesRef.current.length - 1];
         if (!lastMsg) return;
@@ -829,6 +834,7 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
         if (!line.trim()) continue;
         try {
           const data = JSON.parse(line);
+          console.log('[useChat] Received event:', data.type || 'unknown', data);
           await messageHandler(data);
         } catch (e) {
           console.error('Failed to parse stream line:', line, e);

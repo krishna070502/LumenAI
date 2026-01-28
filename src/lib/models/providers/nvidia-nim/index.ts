@@ -5,6 +5,8 @@ import BaseModelProvider from '../../base/provider';
 import BaseLLM from '../../base/llm';
 import OpenAILLM from '../openai/openaiLLM';
 import NvidiaNIMEmbedding from './nvidiaNIMEmbedding';
+import modelListCache from '../../cache';
+import { hashObj } from '@/lib/serverUtils';
 
 interface NvidiaNIMConfig {
     apiKey: string;
@@ -13,40 +15,24 @@ interface NvidiaNIMConfig {
 
 const defaultChatModels: Model[] = [
     {
-        name: 'Llama 4 Maverick 17B 128E Instruct',
-        key: 'meta/llama-4-maverick-17b-128e-instruct',
+        name: 'DeepSeek R1',
+        key: 'deepseek-ai/deepseek-r1',
     },
     {
-        name: 'DeepSeek R1 Distill Llama 8B',
-        key: 'deepseek-ai/deepseek-r1-distill-llama-8b',
-    },
-    {
-        name: 'Code Llama 70B',
-        key: 'meta/codellama-70b',
-    },
-    {
-        name: 'Code Llama 34B',
-        key: 'meta/codellama-34b',
-    },
-    {
-        name: 'Llama 3.1 8B Instruct',
-        key: 'meta/llama-3.1-8b-instruct',
-    },
-    {
-        name: 'Llama 3.1 70B Instruct',
-        key: 'meta/llama-3.1-70b-instruct',
+        name: 'Llama 3.3 70B Instruct',
+        key: 'nvidia/llama-3.3-70b-instruct',
     },
     {
         name: 'Llama 3.1 405B Instruct',
         key: 'meta/llama-3.1-405b-instruct',
     },
     {
-        name: 'Llama 3.2 1B Instruct',
-        key: 'meta/llama-3.2-1b-instruct',
+        name: 'Llama 3.1 70B Instruct',
+        key: 'meta/llama-3.1-70b-instruct',
     },
     {
-        name: 'Llama 3.2 3B Instruct',
-        key: 'meta/llama-3.2-3b-instruct',
+        name: 'Llama 3.1 8B Instruct',
+        key: 'meta/llama-3.1-8b-instruct',
     },
     {
         name: 'Mistral 7B Instruct v0.3',
@@ -59,10 +45,6 @@ const defaultChatModels: Model[] = [
     {
         name: 'Nemotron 4 340B Instruct',
         key: 'nvidia/nemotron-4-340b-instruct',
-    },
-    {
-        name: 'DeepSeek Coder V2',
-        key: 'deepseek-ai/deepseek-coder-v2',
     },
 ];
 
@@ -118,11 +100,62 @@ class NvidiaNIMProvider extends BaseModelProvider<NvidiaNIMConfig> {
     }
 
     async getModelList(): Promise<ModelList> {
+        const cacheKey = `nvidia-nim-${hashObj(this.config)}`;
+        const cached = modelListCache.get(cacheKey);
+        if (cached) return cached;
+
         const { getConfiguredModelProviderById } = await import(
             '@/lib/config/serverRegistry'
         );
         const defaultModels = await this.getDefaultModels();
         const configProvider = getConfiguredModelProviderById(this.id)!;
+
+        try {
+            const response = await fetch(`${this.config.baseURL}/models`, {
+                headers: {
+                    Authorization: `Bearer ${this.config.apiKey}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const fetchedModels = data.data || [];
+
+                const chat: Model[] = [...defaultModels.chat];
+                const embedding: Model[] = [...defaultModels.embedding];
+
+                fetchedModels.forEach((m: any) => {
+                    const id = m.id;
+                    const name = id.split('/').pop().replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+
+                    const model = { name, key: id };
+
+                    // Heuristics for categorization
+                    if (id.includes('embed') || id.includes('retriever')) {
+                        if (!embedding.some(existing => existing.key === id)) {
+                            embedding.push(model);
+                        }
+                    } else if (id.includes('instruct') || id.includes('chat') || id.includes('deepseek') || id.includes('llama') || id.includes('mistral')) {
+                        if (!chat.some(existing => existing.key === id)) {
+                            chat.push(model);
+                        }
+                    }
+                });
+
+                const result = {
+                    embedding: [
+                        ...embedding,
+                        ...configProvider.embeddingModels,
+                    ],
+                    chat: [...chat, ...configProvider.chatModels],
+                };
+
+                modelListCache.set(cacheKey, result);
+                return result;
+            }
+        } catch (err) {
+            console.error('Failed to fetch models from NVIDIA NIM:', err);
+        }
 
         return {
             embedding: [

@@ -5,6 +5,8 @@ import BaseEmbedding from '../../base/embedding';
 import BaseModelProvider from '../../base/provider';
 import BaseLLM from '../../base/llm';
 import OpenAILLM from './openaiLLM';
+import modelListCache from '../../cache';
+import { hashObj } from '@/lib/serverUtils';
 
 interface OpenAIConfig {
   apiKey: string;
@@ -149,11 +151,54 @@ class OpenAIProvider extends BaseModelProvider<OpenAIConfig> {
   }
 
   async getModelList(): Promise<ModelList> {
+    const cacheKey = `openai-${hashObj(this.config)}`;
+    const cached = modelListCache.get(cacheKey);
+    if (cached) return cached;
+
     const { getConfiguredModelProviderById } = await import(
       '@/lib/config/serverRegistry'
     );
     const defaultModels = await this.getDefaultModels();
     const configProvider = getConfiguredModelProviderById(this.id)!;
+
+    try {
+      const response = await fetch(`${this.config.baseURL}/models`, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const fetchedModels = data.data || [];
+
+        const chat: Model[] = [...defaultModels.chat];
+        const embedding: Model[] = [...defaultModels.embedding];
+
+        fetchedModels.forEach((m: any) => {
+          const id = m.id;
+          // Heuristics for categorization
+          if (id.includes('gpt') || id.includes('o1') || id.includes('o3') || id.includes('o4')) {
+            if (!chat.some(existing => existing.key === id)) {
+              chat.push({ name: id, key: id });
+            }
+          } else if (id.includes('embedding')) {
+            if (!embedding.some(existing => existing.key === id)) {
+              embedding.push({ name: id, key: id });
+            }
+          }
+        });
+
+        const result = {
+          embedding: [...embedding, ...configProvider.embeddingModels],
+          chat: [...chat, ...configProvider.chatModels],
+        };
+        modelListCache.set(cacheKey, result);
+        return result;
+      }
+    } catch (err) {
+      console.error('Failed to fetch OpenAI models:', err);
+    }
 
     return {
       embedding: [

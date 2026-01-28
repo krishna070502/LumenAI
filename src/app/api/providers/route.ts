@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 export const GET = async (req: Request) => {
   try {
-    const registry = new ModelRegistry();
+    const registry = ModelRegistry.getInstance();
 
     const activeProviders = await registry.getActiveProviders();
 
@@ -48,7 +48,7 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    const registry = new ModelRegistry();
+    const registry = ModelRegistry.getInstance();
 
     const newProvider = await registry.addProvider(type, name, config);
 

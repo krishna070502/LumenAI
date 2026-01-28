@@ -19,7 +19,7 @@ export const DELETE = async (
       );
     }
 
-    const registry = new ModelRegistry();
+    const registry = ModelRegistry.getInstance();
     await registry.removeProvider(id);
 
     return Response.json(
@@ -63,7 +63,7 @@ export const PATCH = async (
       );
     }
 
-    const registry = new ModelRegistry();
+    const registry = ModelRegistry.getInstance();
 
     const updatedProvider = await registry.updateProvider(id, name, config);
 
