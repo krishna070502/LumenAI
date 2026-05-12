@@ -1,6 +1,9 @@
 {
   "name": "gradia-aiengine",
   "version": "1.12.1",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "license": "MIT",
   "author": "ItzCrazyKns",
   "scripts": {
