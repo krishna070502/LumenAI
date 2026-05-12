@@ -10,7 +10,7 @@ import ChatModeToggle from './MessageInputActions/ChatModeToggle';
 import { cn } from '@/lib/utils';
 
 const EmptyChatMessageInput = () => {
-  const { sendMessage } = useChat();
+  const { sendMessage, isTemporaryChat } = useChat();
 
   /* const [copilotEnabled, setCopilotEnabled] = useState(false); */
   const [message, setMessage] = useState('');
@@ -55,9 +55,14 @@ const EmptyChatMessageInput = () => {
           setMessage('');
         }
       }}
-      className="w-full"
+      className="w-full relative z-20"
     >
-      <div className="flex flex-col bg-light-secondary dark:bg-dark-secondary px-3 pt-5 pb-3 rounded-2xl w-full border border-light-200 dark:border-dark-200 shadow-sm shadow-light-200/10 dark:shadow-black/20 transition-all duration-200 focus-within:border-light-300 dark:focus-within:border-dark-300">
+      <div className={cn(
+        "flex flex-col bg-light-secondary/90 dark:bg-dark-secondary/90 backdrop-blur-md px-3 pt-5 pb-3 rounded-2xl w-full border shadow-sm shadow-light-200/10 dark:shadow-black/20 transition-all duration-500 ease-in-out",
+        isTemporaryChat 
+          ? "border-emerald-500/30 focus-within:border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.05)] dark:shadow-[0_0_20px_rgba(16,185,129,0.1)]" 
+          : "border-light-200 dark:border-dark-200 focus-within:border-light-300 dark:focus-within:border-dark-300"
+      )}>
         <TextareaAutosize
           ref={inputRef}
           value={message}
@@ -82,7 +87,9 @@ const EmptyChatMessageInput = () => {
               className={cn(
                 "relative group rounded-full p-2.5 transition-all duration-300",
                 message.trim().length > 0
-                  ? "bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 hover:from-purple-600 hover:via-purple-700 hover:to-indigo-700 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/40 active:scale-95"
+                  ? isTemporaryChat 
+                    ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:scale-110 hover:shadow-lg hover:shadow-emerald-500/40 active:scale-95"
+                    : "bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 hover:from-purple-600 hover:via-purple-700 hover:to-indigo-700 hover:scale-110 hover:shadow-lg hover:shadow-purple-500/40 active:scale-95"
                   : "bg-light-100 dark:bg-dark-100 border border-light-200 dark:border-dark-200"
               )}
             >
@@ -96,7 +103,10 @@ const EmptyChatMessageInput = () => {
                 )}
               />
               {message.trim().length > 0 && (
-                <span className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300" />
+                <span className={cn(
+                  "absolute inset-0 rounded-full opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300",
+                  isTemporaryChat ? "bg-emerald-500" : "bg-gradient-to-r from-purple-500 to-indigo-500"
+                )} />
               )}
             </button>
           </div>

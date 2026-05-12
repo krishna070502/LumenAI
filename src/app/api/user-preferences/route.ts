@@ -11,6 +11,7 @@ const defaultPreferences = {
     autoMediaSearch: true,
     showWeatherWidget: true,
     showNewsWidget: true,
+    memoryEnabled: true,
 };
 
 const defaultPersonalization = {

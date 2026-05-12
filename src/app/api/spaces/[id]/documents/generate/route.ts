@@ -72,7 +72,7 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
             ? `Create a comprehensive document titled "${documentTitle}" about: ${topic || title}\n\nAdditional requirements: ${requirements}`
             : `Create a comprehensive document titled "${documentTitle}" about: ${topic || title}`;
 
-        const model = nvidia('meta/llama-3.1-405b-instruct');
+        const model = nvidia('meta/llama-3.3-70b-instruct');
 
         const result = await generateText({
             model,

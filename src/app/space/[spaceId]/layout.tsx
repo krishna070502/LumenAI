@@ -30,7 +30,7 @@ export default function SpaceLayout({
             <aside className="hidden lg:block h-full shrink-0">
                 <SpaceSidebar />
             </aside>
-            <main className="flex-1 h-full overflow-hidden min-w-0 bg-[#0A0A0A]">
+            <main className="flex-1 h-full overflow-hidden min-w-0 bg-light-primary dark:bg-dark-primary">
                 {children}
             </main>
         </div>

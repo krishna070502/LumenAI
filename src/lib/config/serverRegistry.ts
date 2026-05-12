@@ -12,4 +12,4 @@ export const getConfiguredModelProviderById = (
 };
 
 export const getSearxngURL = () =>
-  configManager.getConfig('search.searxngURL', '');
+  process.env.SEARXNG_API_URL || configManager.getConfig('search.searxngURL', '');

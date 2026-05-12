@@ -18,7 +18,6 @@ import Loader from '../ui/Loader';
 import { cn } from '@/lib/utils';
 import Models from './Sections/Models/Section';
 import SearchSection from './Sections/Search';
-import Select from '@/components/ui/Select';
 import Personalization from './Sections/Personalization';
 import MemorySection from './Sections/Memory';
 import GuestLimits from './Sections/GuestLimits';
@@ -197,34 +196,28 @@ const SettingsDialogue = ({
                 </div>
               </div>
               <div className="w-full flex flex-col overflow-hidden">
-                <div className="flex flex-row lg:hidden w-full justify-between px-[20px] my-4 flex-shrink-0">
+                <div className="flex lg:hidden items-center gap-3 px-4 py-3 border-b border-light-200/60 dark:border-dark-200/60 flex-shrink-0">
                   <button
                     onClick={() => setIsOpen(false)}
-                    className="group flex flex-row items-center hover:bg-light-200 hover:dark:bg-dark-200 rounded-lg mr-[40%]"
+                    className="p-1.5 hover:bg-light-200 hover:dark:bg-dark-200 rounded-lg"
                   >
-                    <ArrowLeft
-                      size={18}
-                      className="text-black/50 dark:text-white/50 group-hover:text-black/70 group-hover:dark:text-white/70"
-                    />
+                    <ArrowLeft size={22} className="text-black/70 dark:text-white/70" />
                   </button>
-                  <Select
-                    options={sections.map((section) => {
-                      return {
-                        value: section.key,
-                        key: section.key,
-                        label: section.name,
-                      };
-                    })}
+                  <select
                     value={activeSection}
-                    onChange={(e) => {
-                      setActiveSection(e.target.value);
-                    }}
-                    className="!text-xs lg:!text-sm"
-                  />
+                    onChange={(e) => setActiveSection(e.target.value)}
+                    className="flex-1 bg-light-secondary dark:bg-dark-secondary px-3 py-2.5 border border-light-200 dark:border-dark-200 text-black dark:text-white rounded-lg text-sm"
+                  >
+                    {sections.map((section) => (
+                      <option key={section.key} value={section.key}>
+                        {section.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {selectedSection.component && (
                   <div className="flex flex-1 flex-col overflow-hidden">
-                    <div className="border-b border-light-200/60 px-6 pb-6 lg:pt-6 dark:border-dark-200/60 flex-shrink-0">
+                    <div className="hidden lg:block border-b border-light-200/60 px-6 pb-6 lg:pt-6 dark:border-dark-200/60 flex-shrink-0">
                       <div className="flex flex-col">
                         <h4 className="font-medium text-black dark:text-white text-sm lg:text-sm">
                           {selectedSection.name}
@@ -234,7 +227,7 @@ const SettingsDialogue = ({
                         </p>
                       </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto pb-20 lg:pb-4">
                       <selectedSection.component
                         fields={config.fields[selectedSection.dataAdd]}
                         values={config.values[selectedSection.dataAdd]}

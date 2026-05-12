@@ -133,3 +133,37 @@ export const documentShares = pgTable('document_shares', {
   permission: text('permission').$type<'view' | 'edit'>().default('view'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// Task Projects - for organizing tasks into projects/lists
+export const taskProjects = pgTable('task_projects', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  color: text('color').default('#6366f1'), // Default indigo
+  icon: text('icon').default('📁'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Task Tags - for labeling tasks
+export const taskTags = pgTable('task_tags', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  color: text('color').default('#6366f1'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Tasks - main task management table
+export const tasks = pgTable('tasks', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  projectId: text('project_id'), // Optional - references taskProjects
+  title: text('title').notNull(),
+  description: text('description'),
+  priority: text('priority').$type<'low' | 'medium' | 'high'>().default('medium'),
+  status: text('status').$type<'pending' | 'completed'>().default('pending'),
+  dueDate: timestamp('due_date'),
+  tags: jsonb('tags').$type<string[]>().default([]), // Array of tag IDs
+  createdAt: timestamp('created_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+});

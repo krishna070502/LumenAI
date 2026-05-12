@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Folder, Trash2, Edit3, Loader2, Search, LayoutGrid, Clock, Star } from 'lucide-react';
+import { Plus, Folder, Trash2, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth/useAuth';
 
 interface Space {
     id: string;
@@ -16,6 +17,7 @@ interface Space {
 
 const SpacesPage = () => {
     const router = useRouter();
+    const { isAuthenticated, loading: authLoading, login } = useAuth();
     const [spaces, setSpaces] = useState<Space[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -31,15 +33,24 @@ const SpacesPage = () => {
     const icons = ['📁', '💼', '🎯', '💡', '🚀', '📚', '🔬', '🎨', '💻', '📝', '🏠', '🌟'];
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!isAuthenticated) {
+            setSpaces([]);
+            setLoading(false);
+            return;
+        }
         fetchSpaces();
-    }, []);
+    }, [authLoading, isAuthenticated]);
 
     const fetchSpaces = async () => {
+        setLoading(true);
         try {
             const res = await fetch('/api/spaces');
             if (res.ok) {
                 const data = await res.json();
                 setSpaces(data.spaces || []);
+            } else if (res.status === 401) {
+                setSpaces([]);
             }
         } catch (error) {
             console.error('Error fetching spaces:', error);
@@ -48,7 +59,21 @@ const SpacesPage = () => {
         }
     };
 
+    const openCreateModal = () => {
+        if (!isAuthenticated) {
+            toast.error('Please sign in to create spaces');
+            login();
+            return;
+        }
+        setShowCreateModal(true);
+    };
+
     const handleCreateSpace = async () => {
+        if (!isAuthenticated) {
+            toast.error('Please sign in to create spaces');
+            login();
+            return;
+        }
         if (!name.trim()) {
             toast.error('Please enter a space name');
             return;
@@ -105,109 +130,126 @@ const SpacesPage = () => {
         (s.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
     );
 
-    return (
-        <div className="h-screen w-full flex flex-col overflow-hidden bg-[#050505] text-white relative">
-            {/* Subtle Background Effects */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-purple-600/5 blur-[120px] rounded-full" />
-                <div className="absolute bottom-[-5%] right-[-5%] w-[35%] h-[35%] bg-indigo-600/5 blur-[120px] rounded-full" />
-                <div className="absolute inset-0 opacity-[0.02] mix-blend-overlay pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+    // Show loading spinner while auth state is being determined
+    if (authLoading) {
+        return (
+            <div className="min-h-screen w-full flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-light-200 dark:border-dark-200 border-t-purple-500 rounded-full animate-spin" />
             </div>
+        );
+    }
 
-            {/* Clean Top Navigation Bar */}
-            <header className="h-20 shrink-0 border-b border-white/5 bg-black/20 backdrop-blur-xl flex items-center justify-between px-8 z-20">
-                <div className="flex items-center gap-8">
+    // Auth gate — show sign-in prompt for unauthenticated users
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-6">
+                <div className="w-14 h-14 rounded-2xl bg-light-200 dark:bg-dark-200 flex items-center justify-center mb-4">
+                    <Folder size={28} className="text-black/30 dark:text-white/30" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2 text-black dark:text-white">Sign in to create spaces</h3>
+                <p className="text-black/50 dark:text-white/50 text-sm mb-6 max-w-xs">
+                    Spaces are personal workspaces tied to your account.
+                </p>
+                <button
+                    onClick={login}
+                    className="px-5 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-lg text-sm font-medium hover:opacity-90 transition-all flex items-center gap-2"
+                >
+                    Sign In
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen w-full flex flex-col">
+            {/* Header */}
+            <header className="shrink-0 border-b border-light-200 dark:border-dark-200 flex items-center justify-between px-6 py-4">
+                <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                            <Folder size={18} className="text-white" />
-                        </div>
-                        <h1 className="text-2xl font-medium tracking-tight" style={{ fontFamily: 'PP Editorial, serif' }}>
+                        <Folder size={20} className="text-black/70 dark:text-white/70" />
+                        <h1 className="text-lg font-semibold text-black dark:text-white">
                             Spaces
                         </h1>
                     </div>
 
-                    <div className="h-6 w-px bg-white/10 hidden md:block" />
-
-                    <nav className="hidden lg:flex items-center gap-1">
-                        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-white text-xs font-medium transition-all">
+                    <nav className="hidden lg:flex items-center gap-1 ml-4">
+                        <button className="px-3 py-1.5 rounded-lg bg-light-200 dark:bg-dark-200 text-black dark:text-white text-xs font-medium">
                             All Projects
                         </button>
-                        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/5 text-xs font-medium transition-all">
+                        <button className="px-3 py-1.5 rounded-lg text-black/50 dark:text-white/50 hover:bg-light-200 dark:hover:bg-dark-200 text-xs font-medium transition-colors">
                             Recent
                         </button>
-                        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/5 text-xs font-medium transition-all">
+                        <button className="px-3 py-1.5 rounded-lg text-black/50 dark:text-white/50 hover:bg-light-200 dark:hover:bg-dark-200 text-xs font-medium transition-colors">
                             Favorites
                         </button>
                     </nav>
                 </div>
 
-                <div className="flex items-center gap-4 flex-1 max-w-xl justify-end">
-                    <div className="w-full relative group max-w-xs">
-                        <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-purple-500 transition-colors" />
+                <div className="flex items-center gap-3">
+                    <div className="relative max-w-xs">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40" />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search projects..."
-                            className="w-full bg-white/5 border border-white/5 rounded-xl py-2 pl-10 pr-4 text-xs focus:outline-none focus:ring-1 focus:ring-purple-600/30 focus:bg-white/10 transition-all placeholder-white/20"
+                            className="w-48 bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 rounded-lg py-2 pl-9 pr-3 text-sm text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all placeholder-black/40 dark:placeholder-white/40"
                         />
                     </div>
 
                     <button
-                        onClick={() => setShowCreateModal(true)}
-                        className="shrink-0 flex items-center gap-2 px-4 py-2 bg-white text-black rounded-xl text-xs font-bold shadow-md hover:bg-white/90 active:scale-95 transition-all"
+                        onClick={openCreateModal}
+                        className="flex items-center gap-2 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg text-sm font-medium hover:opacity-90 active:scale-95 transition-all"
                     >
-                        <Plus size={14} />
+                        <Plus size={16} />
                         New Space
                     </button>
                 </div>
             </header>
 
-            {/* Professional Wide-Screen Content */}
-            <main className="flex-1 overflow-y-auto no-scrollbar z-10 relative">
-                <div className="max-w-[1600px] mx-auto p-8 pb-32">
-                    <div className="flex items-end justify-between mb-8 px-1">
-                        <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Workspace</span>
-                            <div className="flex items-baseline gap-2">
-                                <h2 className="text-xl font-medium text-white/80">Active Projects</h2>
-                                <span className="text-white/20 text-xs">{spaces.length} total</span>
-                            </div>
+            {/* Content */}
+            <main className="flex-1 overflow-y-auto p-6 pb-32">
+                <div className="max-w-6xl mx-auto">
+                    <div className="mb-6">
+                        <span className="text-xs font-medium text-black/40 dark:text-white/40 uppercase tracking-wider">Workspace</span>
+                        <div className="flex items-baseline gap-2 mt-1">
+                            <h2 className="text-lg font-semibold text-black dark:text-white">Active Projects</h2>
+                            <span className="text-black/40 dark:text-white/40 text-xs">{spaces.length} total</span>
                         </div>
                     </div>
 
                     {loading ? (
                         <div className="h-[40vh] flex items-center justify-center">
-                            <Loader2 className="w-8 h-8 animate-spin text-purple-500/50" />
+                            <Loader2 className="w-6 h-6 animate-spin text-black/30 dark:text-white/30" />
                         </div>
                     ) : filteredSpaces.length === 0 ? (
-                        <div className="h-[50vh] flex flex-col items-center justify-center text-center max-w-md mx-auto">
-                            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-6 border border-white/10 shadow-inner">
-                                <Folder size={32} className="text-white/10" />
+                        <div className="h-[50vh] flex flex-col items-center justify-center text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-light-200 dark:bg-dark-200 flex items-center justify-center mb-4">
+                                <Folder size={28} className="text-black/30 dark:text-white/30" />
                             </div>
-                            <h3 className="text-xl font-semibold mb-2 text-white/80">No workspaces yet</h3>
-                            <p className="text-white/30 text-sm leading-relaxed mb-8">
-                                Initialize a focused environment to organize your conversations and documents.
+                            <h3 className="text-lg font-semibold mb-2 text-black dark:text-white">No workspaces yet</h3>
+                            <p className="text-black/50 dark:text-white/50 text-sm mb-6 max-w-xs">
+                                Create a focused environment to organize your conversations.
                             </p>
                             <button
-                                onClick={() => setShowCreateModal(true)}
-                                className="px-6 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-semibold transition-all flex items-center gap-2"
+                                onClick={openCreateModal}
+                                className="px-5 py-2.5 bg-light-200 dark:bg-dark-200 hover:bg-light-300 dark:hover:bg-dark-300 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
                             >
-                                <Plus size={18} />
+                                <Plus size={16} />
                                 Create Space
                             </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             {filteredSpaces.map((space) => (
                                 <div
                                     key={space.id}
                                     onClick={() => router.push(`/space/${space.id}`)}
-                                    className="group relative h-64 rounded-[32px] border border-white/5 bg-[#0D0D0D] hover:bg-[#121212] hover:border-purple-500/20 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col"
+                                    className="group relative rounded-xl border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary hover:bg-light-200 dark:hover:bg-dark-200 transition-all cursor-pointer"
                                 >
-                                    <div className="p-8 flex flex-col h-full relative z-10">
-                                        <div className="flex items-start justify-between mb-6">
-                                            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-3xl border border-white/5 group-hover:border-purple-500/20 transition-all duration-300">
+                                    <div className="p-4">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="w-10 h-10 rounded-lg bg-light-200 dark:bg-dark-200 flex items-center justify-center text-xl group-hover:scale-105 transition-transform">
                                                 {space.icon}
                                             </div>
                                             <button
@@ -215,27 +257,22 @@ const SpacesPage = () => {
                                                     e.stopPropagation();
                                                     handleDeleteSpace(space.id);
                                                 }}
-                                                className="w-10 h-10 rounded-xl text-white/5 hover:text-red-500/70 flex items-center justify-center transition-all duration-300"
+                                                className="p-1.5 rounded-lg text-black/20 dark:text-white/20 hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
                                             >
-                                                <Trash2 size={16} className="opacity-0 group-hover:opacity-100" />
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
 
-                                        <div className="mt-auto">
-                                            <h3 className="text-xl font-semibold text-white/90 mb-1.5 group-hover:text-white transition-colors tracking-tight">
-                                                {space.name}
-                                            </h3>
-                                            <p className="text-sm text-white/30 group-hover:text-white/50 line-clamp-2 leading-relaxed transition-colors">
-                                                {space.description || "Establish a dedicated mission for this workspace."}
-                                            </p>
-                                        </div>
+                                        <h3 className="text-sm font-semibold text-black dark:text-white mb-1">
+                                            {space.name}
+                                        </h3>
+                                        <p className="text-xs text-black/50 dark:text-white/50 line-clamp-2">
+                                            {space.description || "No description"}
+                                        </p>
 
-                                        <div className="mt-6 flex items-center justify-between pt-5 border-t border-white/5">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-purple-500 group-hover:scale-110 transition-transform" />
-                                                <span className="text-[9px] font-bold text-white/10 group-hover:text-white/20 uppercase tracking-widest transition-colors">Workspace</span>
-                                            </div>
-                                            <Edit3 size={14} className="text-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <div className="mt-3 pt-3 border-t border-light-200 dark:border-dark-200 flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                            <span className="text-[10px] font-medium text-black/40 dark:text-white/40">Workspace</span>
                                         </div>
                                     </div>
                                 </div>
@@ -245,89 +282,80 @@ const SpacesPage = () => {
                 </div>
             </main>
 
-            {/* Refined Create Modal */}
+            {/* Create Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-                    <div className="bg-[#0D0D0D] rounded-[40px] p-10 w-full max-w-2xl border border-white/5 shadow-2xl relative overflow-hidden">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center border border-purple-500/10">
-                                    <Plus className="text-purple-500" size={24} />
-                                </div>
-                                <h2 className="text-2xl font-semibold text-white tracking-tight">New Workspace</h2>
-                            </div>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+                    <div className="bg-light-primary dark:bg-dark-primary rounded-xl p-5 w-full max-w-md border border-light-200 dark:border-dark-200 shadow-xl">
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-base font-semibold text-black dark:text-white">New Workspace</h2>
                             <button
                                 onClick={() => { setShowCreateModal(false); resetForm(); }}
-                                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/20 hover:text-white transition-all"
+                                className="p-1.5 rounded-lg hover:bg-light-200 dark:hover:bg-dark-200 text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-all"
                             >
-                                <Plus size={18} className="rotate-45" />
+                                <Plus size={16} className="rotate-45" />
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-6">
-                                <div className="space-y-2.5">
-                                    <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest px-1">Name</label>
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        placeholder="Project Alpha..."
-                                        className="w-full px-5 py-3.5 rounded-2xl border border-white/5 bg-white/5 text-white placeholder-white/10 focus:outline-none focus:ring-1 focus:ring-purple-600/30 transition-all font-medium"
-                                    />
-                                </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-black/60 dark:text-white/60 mb-1.5">Name</label>
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="Project name..."
+                                    className="w-full px-3 py-2.5 rounded-lg border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary text-black dark:text-white placeholder-black/40 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/30 text-sm"
+                                />
+                            </div>
 
-                                <div className="space-y-2.5">
-                                    <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest px-1">Icon</label>
-                                    <div className="grid grid-cols-6 gap-2">
-                                        {icons.map((i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => setIcon(i)}
-                                                className={`h-11 rounded-xl flex items-center justify-center text-xl transition-all ${icon === i
-                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20'
-                                                    : 'bg-white/5 text-white/30 hover:bg-white/10 hover:text-white'
-                                                    }`}
-                                            >
-                                                {i}
-                                            </button>
-                                        ))}
-                                    </div>
+                            <div>
+                                <label className="block text-xs font-medium text-black/60 dark:text-white/60 mb-1.5">Icon</label>
+                                <div className="grid grid-cols-6 gap-1.5">
+                                    {icons.map((i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setIcon(i)}
+                                            className={`h-9 rounded-lg flex items-center justify-center text-base transition-all ${icon === i
+                                                ? 'bg-purple-500 text-white'
+                                                : 'bg-light-200 dark:bg-dark-200 hover:bg-light-300 dark:hover:bg-dark-300'
+                                                }`}
+                                        >
+                                            {i}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
-                            <div className="space-y-6">
-                                <div className="space-y-2.5">
-                                    <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest px-1">Description</label>
-                                    <input
-                                        type="text"
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="Summary..."
-                                        className="w-full px-5 py-3.5 rounded-2xl border border-white/5 bg-white/5 text-white placeholder-white/10 focus:outline-none focus:ring-1 focus:ring-purple-600/30 transition-all font-medium"
-                                    />
-                                </div>
+                            <div>
+                                <label className="block text-xs font-medium text-black/60 dark:text-white/60 mb-1.5">Description</label>
+                                <input
+                                    type="text"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    placeholder="Brief description..."
+                                    className="w-full px-3 py-2.5 rounded-lg border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary text-black dark:text-white placeholder-black/40 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/30 text-sm"
+                                />
+                            </div>
 
-                                <div className="space-y-2.5">
-                                    <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest px-1">AI Context</label>
-                                    <textarea
-                                        value={systemPrompt}
-                                        onChange={(e) => setSystemPrompt(e.target.value)}
-                                        placeholder="Specific instructions..."
-                                        rows={4}
-                                        className="w-full px-5 py-4 rounded-[24px] border border-white/5 bg-white/5 text-white placeholder-white/10 focus:outline-none focus:ring-1 focus:ring-purple-600/30 transition-all font-medium resize-none text-sm leading-relaxed"
-                                    />
-                                </div>
+                            <div>
+                                <label className="block text-xs font-medium text-black/60 dark:text-white/60 mb-1.5">AI Context (Optional)</label>
+                                <textarea
+                                    value={systemPrompt}
+                                    onChange={(e) => setSystemPrompt(e.target.value)}
+                                    placeholder="Instructions for AI..."
+                                    rows={2}
+                                    className="w-full px-3 py-2.5 rounded-lg border border-light-200 dark:border-dark-200 bg-light-secondary dark:bg-dark-secondary text-black dark:text-white placeholder-black/40 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/30 text-sm resize-none"
+                                />
                             </div>
                         </div>
 
                         <button
                             onClick={handleCreateSpace}
                             disabled={creating}
-                            className="w-full mt-10 py-4 rounded-2xl bg-white text-black font-bold text-sm tracking-tight hover:bg-white/90 transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
+                            className="w-full mt-5 py-2.5 rounded-lg bg-black dark:bg-white text-white dark:text-black font-medium text-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
                         >
-                            {creating ? <Loader2 size={20} className="animate-spin" /> : <Plus size={18} />}
-                            Initialize Workspace
+                            {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                            Create
                         </button>
                     </div>
                 </div>

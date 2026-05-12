@@ -116,7 +116,7 @@ const ensureChatExists = async (input: {
 const generateChatTitle = async (query: string, response: string, chatId: string): Promise<void> => {
   try {
     const result = await generateText({
-      model: nim.chatModel('meta/llama-3.1-405b-instruct'),
+      model: nim.chatModel('meta/llama-3.3-70b-instruct'),
       system: 'You are a helpful assistant that generates concise chat titles. Generate a short, descriptive title (3-6 words) that summarizes the conversation topic. Only output the title, nothing else.',
       messages: [
         { role: 'user', content: query },

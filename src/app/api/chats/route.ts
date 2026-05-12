@@ -1,6 +1,6 @@
 import db from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, isNull, and } from 'drizzle-orm';
 import { chats } from '@/lib/db/schema';
 
 export const GET = async (req: Request) => {
@@ -15,8 +15,9 @@ export const GET = async (req: Request) => {
     }
 
     console.log(`[api/chats] Fetching chats for userId: ${user.id}`);
+    // Only return chats that are NOT assigned to a space
     const userChats = await db.query.chats.findMany({
-      where: eq(chats.userId, user.id),
+      where: and(eq(chats.userId, user.id), isNull(chats.spaceId)),
       orderBy: [desc(chats.createdAt)],
     });
     console.log(`[api/chats] Found ${userChats.length} chats for user ${user.id}`);

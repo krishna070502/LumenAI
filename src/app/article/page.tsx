@@ -346,7 +346,7 @@ function ArticleContent() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-light-primary dark:bg-dark-primary">
+            <div className="h-screen flex items-center justify-center">
                 <div className="flex flex-col items-center space-y-4">
                     <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
                     <p className="text-black/60 dark:text-white/60 text-sm">Loading article...</p>
@@ -357,7 +357,7 @@ function ArticleContent() {
 
     if (error || !article) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-light-primary dark:bg-dark-primary">
+            <div className="h-screen flex items-center justify-center">
                 <div className="text-center space-y-4 p-6">
                     <p className="text-red-500">{error || 'Article not found'}</p>
                     <Link href="/discover" className="text-purple-500 hover:underline">
@@ -369,10 +369,10 @@ function ArticleContent() {
     }
 
     return (
-        <div className="min-h-screen bg-light-primary dark:bg-dark-primary">
-            {/* Header - Fixed */}
-            <header className="sticky top-0 z-20 bg-light-primary/95 dark:bg-dark-primary/95 backdrop-blur-md border-b border-light-200/50 dark:border-dark-200/50">
-                <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div className="h-screen overflow-y-auto">
+            {/* Header - Fixed with glass consistency */}
+            <header className="sticky top-0 z-20 bg-light-primary/80 dark:bg-dark-primary/80 backdrop-blur-xl border-b border-light-200/30 dark:border-dark-200/30">
+                <div className="max-w-4xl mx-auto px-6 sm:px-8 py-4 flex items-center justify-between">
                     <Link
                         href="/discover"
                         className="flex items-center space-x-2 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white transition-colors"
@@ -415,7 +415,7 @@ function ArticleContent() {
             </header>
 
             {/* Main Content */}
-            <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+            <main className="max-w-4xl mx-auto px-6 sm:px-8 py-8 sm:py-12 pb-24">
                 {/* Thumbnail */}
                 {article.thumbnail && (
                     <div className="relative w-full aspect-[16/9] sm:aspect-[2/1] rounded-xl sm:rounded-2xl overflow-hidden mb-6 shadow-lg">
@@ -527,7 +527,7 @@ function ArticleContent() {
 export default function ArticlePage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center bg-light-primary dark:bg-dark-primary">
+            <div className="h-screen flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
             </div>
         }>

@@ -140,19 +140,36 @@ export async function POST(request: NextRequest) {
             articleContent = cleanHtml;
         }
 
-        // Helper function to clean text
+        // Helper function to clean text and decode HTML entities
         const cleanText = (text: string): string => {
-            return text
+            if (!text) return '';
+            
+            // 1. Basic entity and HTML tag cleanup
+            let clean = text
                 .replace(/<[^>]+>/g, ' ')
                 .replace(/&nbsp;/g, ' ')
                 .replace(/&amp;/g, '&')
                 .replace(/&quot;/g, '"')
                 .replace(/&apos;/g, "'")
+                .replace(/&rsquo;/g, "'")
+                .replace(/&lsquo;/g, "'")
+                .replace(/&ldquo;/g, '"')
+                .replace(/&rdquo;/g, '"')
+                .replace(/&ndash;/g, '-')
+                .replace(/&mdash;/g, '—')
                 .replace(/&lt;/g, '<')
                 .replace(/&gt;/g, '>')
-                .replace(/&#\d+;/g, '')
+                // Decode Decimal Entities (e.g. &#39;)
+                .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+                // Decode Hexadecimal Entities (e.g. &#x27;)
+                .replace(/&#[xX]([0-9A-Fa-f]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
                 .replace(/\s+/g, ' ')
                 .trim();
+
+            // 2. Strip UI component artifacts commonly prepended to content nodes
+            clean = clean.replace(/^(Loader\s+|Save\s+Story\s+|Comment\s+|Share\s+story\s+)+/gi, '');
+            
+            return clean.trim();
         };
 
         // Extract structured content with headings and paragraphs
@@ -338,7 +355,7 @@ export async function POST(request: NextRequest) {
         const author = authorMatch ? authorMatch[1] : null;
 
         return NextResponse.json({
-            title: title.replace(/\s*\|.*$/, '').replace(/\s*-\s*[^-]+$/, '').trim(),
+            title: cleanText(title.replace(/\s*\|.*$/, '').replace(/\s*-\s*[^-]+$/, '')),
             contentBlocks,
             description,
             thumbnail,

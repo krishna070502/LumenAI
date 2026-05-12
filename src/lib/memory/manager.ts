@@ -42,10 +42,8 @@ export class MemoryManager {
             console.log(`[MemoryManager] searchMemories query raw dimension: ${queryEmbedding.length}`);
             queryEmbedding = this.normalizeEmbedding(queryEmbedding);
 
-            // 2. Perform Hybrid Search
-            // We use cosine similarity (1 - cosine distance)
+            const similarityLimit = 0.4;
             const similarityExpression = sql<number>`1 - (${memories.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector)`;
-
             const results = await db.select({
                 id: memories.id,
                 content: memories.content,
@@ -59,15 +57,14 @@ export class MemoryManager {
                 .where(and(
                     eq(memories.userId, userId),
                     or(
-                        // Lower threshold from 0.75 to 0.4 to account for padded vectors
-                        sql`${similarityExpression} > 0.4`,
+                        sql`${similarityExpression} > ${similarityLimit}`,
                         ilike(memories.content, `%${query}%`)
                     )
                 ))
                 .orderBy(desc(similarityExpression))
                 .limit(topK * 2);
 
-            console.log(`[MemoryManager] Found ${results.length} potential memories for user ${userId}`);
+            console.log(`[MemoryManager] searchMemories for ${userId}: Found ${results.length} results above ${similarityLimit} similarity or keyword match.`);
 
             // FALLBACK: If semantic search found nothing, fetch ALL user memories
             // This handles cross-provider embedding mismatches (e.g., Gemini saved, NVIDIA searching)
@@ -157,7 +154,7 @@ export class MemoryManager {
 
             if (existing.length > 0) {
                 const firstExisting = existing[0];
-                // In a pro version we'd use generateText to merge them.
+                console.log(`[MemoryManager] Consolidating memory with existing similar record (${firstExisting.id})`);
                 await db.update(memories)
                     .set({
                         content: newMemory.content,
@@ -166,6 +163,7 @@ export class MemoryManager {
                     })
                     .where(eq(memories.id, firstExisting.id));
             } else {
+                console.log(`[MemoryManager] Saving new unique memory for user ${userId}`);
                 await db.insert(memories).values({
                     userId,
                     content: newMemory.content,
@@ -190,12 +188,13 @@ export class MemoryManager {
         }
 
         const prompt = `
-      Analyze the following chat history and extract a list of NEW, MEANINGFUL personal facts, research interests, or specific areas of knowledge the user cares about.
+      Analyze the following chat history and extract a list of NEW, MEANINGFUL personal facts, user preferences, research interests, or specific areas of knowledge the user cares about.
       
       Guidelines:
-      - Extract persistent facts (name, job, location).
-      - Extract long-term interests (e.g., "The user is deeply interested in Quantum Computing research" or "The user frequently searches for advanced TypeScript patterns").
-      - Do NOT extract one-off queries or ephemeral context.
+      - Extract persistent facts (name, job, location, birthdate, company).
+      - Extract preferences (e.g., "The user prefers dark mode", "The user likes concise answers", "The user is working on a Next.js project").
+      - Extract long-term interests (e.g., "The user is deeply interested in Quantum Computing research").
+      - Do NOT extract one-off queries, ephemeral context, or information about yourself (LumenAI).
       - Assign an importance score (1-5).
       - Format as a JSON array of objects: { "content": string, "importance": number }
       

@@ -69,7 +69,7 @@ RULES:
 
         const userPrompt = textToComplete;
 
-        const model = nvidia('meta/llama-3.1-405b-instruct');
+        const model = nvidia('meta/llama-3.3-70b-instruct');
 
         const result = await generateText({
             model,

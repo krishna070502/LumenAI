@@ -24,9 +24,7 @@ export default function UserAvatar() {
 
     if (loading) {
         return (
-            <div className="w-10 h-10 rounded-full bg-light-200 dark:bg-dark-200 flex items-center justify-center border border-light-300 dark:border-dark-300">
-                <div className="w-4 h-4 border-2 border-black/20 dark:border-white/20 border-t-black/70 dark:border-t-white/70 rounded-full animate-spin" />
-            </div>
+            <div className="w-10 h-10 rounded-full bg-light-200 dark:bg-dark-200 border border-light-300 dark:border-dark-300 animate-pulse" />
         );
     }
 

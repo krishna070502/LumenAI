@@ -20,11 +20,7 @@ const defaultChatModels: Model[] = [
     },
     {
         name: 'Llama 3.3 70B Instruct',
-        key: 'nvidia/llama-3.3-70b-instruct',
-    },
-    {
-        name: 'Llama 3.1 405B Instruct',
-        key: 'meta/llama-3.1-405b-instruct',
+        key: 'meta/llama-3.3-70b-instruct',
     },
     {
         name: 'Llama 3.1 70B Instruct',

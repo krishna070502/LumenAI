@@ -196,3 +196,72 @@ html.dark .gradient-bg,
   animation: text-stream-in 0.12s ease-out forwards;
   display: inline;
 }
+
+/* --- Temporary Chat Mode Special Backgrounds & Animations --- */
+@keyframes float-blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+.animate-float-blob {
+  animation: float-blob 15s infinite ease-in-out;
+}
+
+.animate-float-blob-delayed {
+  animation: float-blob 18s infinite ease-in-out reverse;
+  animation-delay: -2s;
+}
+
+.animate-float-blob-slow {
+  animation: float-blob 25s infinite ease-in-out;
+  animation-delay: -5s;
+}
+
+/* Premium grid overlay for incognito feel */
+.bg-grid-pattern {
+  background-size: 30px 30px;
+  background-image: linear-gradient(to right, rgba(16, 185, 129, 0.05) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(16, 185, 129, 0.05) 1px, transparent 1px);
+}
+
+.dark .bg-grid-pattern {
+  background-image: linear-gradient(to right, rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
+}
+
+/* Shine effect for badges */
+.shine-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine-effect::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to bottom right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.1) 40%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.1) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(45deg);
+  animation: shine-slide 4s infinite;
+}
+
+@keyframes shine-slide {
+  0% { transform: translateX(-150%) rotate(45deg); }
+  20% { transform: translateX(150%) rotate(45deg); }
+  100% { transform: translateX(150%) rotate(45deg); }
+}

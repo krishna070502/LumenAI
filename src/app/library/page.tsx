@@ -2,10 +2,11 @@
 
 import DeleteChat from '@/components/DeleteChat';
 import { formatTimeDifference } from '@/lib/utils';
-import { BookOpenText, ClockIcon, FileText, Globe2Icon, Bookmark, Trash2, ExternalLink, Search, X } from 'lucide-react';
+import { BookOpenText, ClockIcon, FileText, Globe2Icon, Bookmark, Trash2, ExternalLink, Search, X, LogIn } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth/useAuth';
 
 export interface Chat {
   id: string;
@@ -27,6 +28,7 @@ interface SavedArticle {
 type Tab = 'chats' | 'saved';
 
 const Page = () => {
+  const { isAuthenticated, loading: authLoading, login } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
   const [chats, setChats] = useState<Chat[]>([]);
   const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
@@ -46,6 +48,8 @@ const Page = () => {
   );
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const fetchChats = async () => {
       setLoading(true);
 
@@ -90,7 +94,7 @@ const Page = () => {
 
     fetchChats();
     fetchSavedArticles();
-  }, []);
+  }, [isAuthenticated]);
 
   const handleRemoveBookmark = async (url: string) => {
     try {
@@ -105,6 +109,36 @@ const Page = () => {
       toast.error('Failed to remove article');
     }
   };
+
+  // Show loading spinner while auth state is being determined
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-8 h-8 border-2 border-light-200 dark:border-dark-200 border-t-purple-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Auth gate — show sign-in prompt for unauthenticated users
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center px-6 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-light-200 dark:bg-dark-200 flex items-center justify-center mb-4">
+          <BookOpenText size={26} className="text-black/30 dark:text-white/30" />
+        </div>
+        <h2 className="text-lg font-semibold text-black dark:text-white">Sign in to see your library</h2>
+        <p className="mt-2 text-sm text-black/50 dark:text-white/50 max-w-sm">
+          Your past chats, sources, and saved articles will appear here once you sign in.
+        </p>
+        <button
+          onClick={login}
+          className="mt-5 px-5 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-lg text-sm font-medium hover:opacity-90 transition-all"
+        >
+          Sign In
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -2,6 +2,6 @@ import { authApiHandler } from '@neondatabase/auth/next/server';
 
 export const runtime = 'nodejs';
 
-const { GET, POST, PUT, DELETE, PATCH } = authApiHandler();
-
+const handler = authApiHandler();
+const { GET, POST, PUT, DELETE, PATCH } = handler;
 export { GET, POST, PUT, DELETE, PATCH };

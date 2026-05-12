@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await generateText({
-            model: nim.chatModel('meta/llama-3.1-405b-instruct'),
+            model: nim.chatModel('meta/llama-3.3-70b-instruct'),
             system: `You are an expert summarizer. Create a clear, concise summary of the article content provided.
 
 Guidelines:

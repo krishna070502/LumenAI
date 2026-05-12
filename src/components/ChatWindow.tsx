@@ -34,7 +34,7 @@ export interface Widget {
 }
 
 const ChatWindow = () => {
-  const { hasError, notFound, messages, isReady } = useChat();
+  const { hasError, notFound, messages, isReady, isTemporaryChat } = useChat();
 
   if (hasError) {
     return (
@@ -55,15 +55,36 @@ const ChatWindow = () => {
     notFound ? (
       <NextError statusCode={404} />
     ) : (
-      <div className="h-full flex flex-col overflow-x-hidden">
-        {messages.length > 0 ? (
-          <>
-            <Navbar />
-            <Chat />
-          </>
-        ) : (
-          <EmptyChat />
+      <div className="relative h-full flex flex-col overflow-hidden">
+        {/* Temporary Chat Special Effects Layer */}
+        {isTemporaryChat && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 bg-light-primary dark:bg-dark-primary">
+            {/* Elegant Grid Background */}
+            <div className="absolute inset-0 bg-grid-pattern opacity-100 transition-opacity duration-700" />
+
+            {/* Vignette Overlay */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.1)_100%)] dark:bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.3)_100%)]" />
+
+            {/* Atmospheric Animated Blobs */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 dark:bg-emerald-500/5 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[80px] animate-float-blob" />
+            <div className="absolute top-[20%] right-[-10%] w-[35%] h-[35%] bg-teal-500/10 dark:bg-teal-500/5 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[80px] animate-float-blob-delayed" />
+            <div className="absolute bottom-[-10%] left-[30%] w-[45%] h-[45%] bg-green-500/10 dark:bg-green-500/5 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[80px] animate-float-blob-slow" />
+
+            {/* Global Border Glow when in Temp Mode */}
+            <div className="absolute inset-0 border border-emerald-500/10 dark:border-emerald-500/5 rounded-[inherit]" />
+          </div>
         )}
+
+        <div className="relative z-10 h-full flex flex-col overflow-x-hidden">
+          {messages.length > 0 ? (
+            <>
+              <Navbar />
+              <Chat />
+            </>
+          ) : (
+            <EmptyChat />
+          )}
+        </div>
       </div>
     )
   ) : (

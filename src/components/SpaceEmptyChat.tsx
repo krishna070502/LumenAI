@@ -18,7 +18,7 @@ const SpaceEmptyChat = ({ spaceName, spaceIcon, spaceDescription }: SpaceEmptyCh
                         <h2
                             className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight"
                             style={{
-                                background: 'linear-gradient(90deg, #22d3ee, #a3e635, #facc15, #fb923c, #f87171, #a855f7, #6366f1)',
+                                backgroundImage: 'linear-gradient(90deg, #22d3ee, #a3e635, #facc15, #fb923c, #f87171, #a855f7, #6366f1)',
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
                                 backgroundClip: 'text',

@@ -14,16 +14,26 @@ const WeatherWidget = () => {
   });
 
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   const getApproxLocation = async () => {
-    const res = await fetch('https://ipwhois.app/json/');
-    const data = await res.json();
+    try {
+      const res = await fetch('https://ipwhois.app/json/');
+      const data = await res.json();
 
-    return {
-      latitude: data.latitude,
-      longitude: data.longitude,
-      city: data.city,
-    };
+      return {
+        latitude: data.latitude,
+        longitude: data.longitude,
+        city: data.city,
+      };
+    } catch (error) {
+      console.error('Failed to get approximate location:', error);
+      return {
+        latitude: 0,
+        longitude: 0,
+        city: 'Unknown',
+      };
+    }
   };
 
   const getLocation = async (
@@ -34,35 +44,75 @@ const WeatherWidget = () => {
     }) => void,
   ) => {
     if (navigator.geolocation) {
-      const result = await navigator.permissions.query({
-        name: 'geolocation',
-      });
-
-      if (result.state === 'granted') {
-        navigator.geolocation.getCurrentPosition(async (position) => {
-          const res = await fetch(
-            `https://api-bdc.io/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
-            {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            },
-          );
-
-          const data = await res.json();
-
-          callback({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            city: data.locality,
+      let result: PermissionStatus | null = null;
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          result = await navigator.permissions.query({
+            name: 'geolocation',
           });
-        });
-      } else if (result.state === 'prompt') {
+        }
+      } catch (e) {
+        console.warn('Permissions API not supported or failed:', e);
+      }
+
+      if (result && result.state === 'granted') {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const res = await fetch(
+                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
+                {
+                  method: 'GET',
+                },
+              );
+
+              if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+              const data = await res.json();
+
+              callback({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                city: data.locality || data.city || 'Unknown',
+              });
+            } catch (error) {
+              console.error('Failed to reverse geocode:', error);
+              callback(await getApproxLocation());
+            }
+          },
+          async (error) => {
+            console.error('Geolocation error:', error);
+            callback(await getApproxLocation());
+          },
+        );
+      } else if (result && result.state === 'prompt') {
         callback(await getApproxLocation());
         navigator.geolocation.getCurrentPosition((position) => {});
-      } else if (result.state === 'denied') {
+      } else if (result && result.state === 'denied') {
         callback(await getApproxLocation());
+      } else if (!result) {
+        // Fallback for missing permissions API: try to get position directly
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const res = await fetch(
+                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
+                { method: 'GET' },
+              );
+              const data = await res.json();
+              callback({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                city: data.locality || data.city || 'Unknown',
+              });
+            } catch (error) {
+              callback(await getApproxLocation());
+            }
+          },
+          async () => {
+            callback(await getApproxLocation());
+          },
+        );
       }
     } else {
       callback(await getApproxLocation());
@@ -71,42 +121,52 @@ const WeatherWidget = () => {
 
   const updateWeather = async () => {
     getLocation(async (location) => {
-      const res = await fetch(`/api/weather`, {
-        method: 'POST',
-        body: JSON.stringify({
-          lat: location.latitude,
-          lng: location.longitude,
-          measureUnit: localStorage.getItem('measureUnit') ?? 'Metric',
-        }),
-      });
+      try {
+        const res = await fetch(`/api/weather`, {
+          method: 'POST',
+          body: JSON.stringify({
+            lat: location.latitude,
+            lng: location.longitude,
+            measureUnit: localStorage.getItem('measureUnit') ?? 'Metric',
+          }),
+        });
 
-      const data = await res.json();
+        if (res.status !== 200) {
+          setHasError(true);
+          setLoading(false);
+          return;
+        }
 
-      if (res.status !== 200) {
-        console.error('Error fetching weather data');
+        const data = await res.json();
+
+        setData({
+          temperature: data.temperature,
+          condition: data.condition,
+          location: location.city,
+          humidity: data.humidity,
+          windSpeed: data.windSpeed,
+          icon: data.icon,
+          temperatureUnit: data.temperatureUnit,
+          windSpeedUnit: data.windSpeedUnit,
+        });
+      } catch (error) {
+        console.error('Failed to update weather:', error);
+        setHasError(true);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      setData({
-        temperature: data.temperature,
-        condition: data.condition,
-        location: location.city,
-        humidity: data.humidity,
-        windSpeed: data.windSpeed,
-        icon: data.icon,
-        temperatureUnit: data.temperatureUnit,
-        windSpeedUnit: data.windSpeedUnit,
-      });
-      setLoading(false);
     });
   };
 
   useEffect(() => {
     updateWeather();
-    const intervalId = setInterval(updateWeather, 30 * 1000);
+    const intervalId = setInterval(() => {
+      if (!hasError) updateWeather();
+    }, 30 * 1000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [hasError]);
+
+  if (hasError) return null;
 
   return (
     <div className="bg-light-secondary dark:bg-dark-secondary rounded-2xl border border-light-200 dark:border-dark-200 shadow-sm shadow-light-200/10 dark:shadow-black/25 flex flex-row items-center w-full h-24 min-h-[96px] max-h-[96px] px-3 py-2 gap-3">

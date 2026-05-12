@@ -18,6 +18,7 @@ import { MinimalProvider } from '../models/types';
 import { getAutoMediaSearch } from '../config/clientRegistry';
 import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
+import { useAuth } from '@/lib/auth/useAuth';
 
 export type Section = {
   message: Message;
@@ -83,6 +84,14 @@ interface EmbeddingModelProvider {
   key: string;
   providerId: string;
 }
+
+type GuestLimitPeriod = 'session' | 'daily';
+
+type GuestLimits = {
+  guestChatLimit: number;
+  guestResearchLimit: number;
+  guestLimitPeriod: GuestLimitPeriod;
+};
 
 const checkConfig = async (
   setChatModelProvider: (provider: ChatModelProvider) => void,
@@ -294,6 +303,9 @@ export const chatContext = createContext<ChatContext>({
 
 export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = null }: { children: React.ReactNode; spaceSystemPrompt?: string | null; spaceId?: string | null }) => {
   const params: { chatId: string } = useParams();
+  const { isAuthenticated, loading: authLoading, login } = useAuth();
+  const guestLimitsRef = useRef<GuestLimits | null>(null);
+  const guestLimitsLoadingRef = useRef(false);
 
   const searchParams = useSearchParams();
   const initialMessage = searchParams.get('q');
@@ -338,7 +350,110 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
   const [isConfigReady, setIsConfigReady] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  
+  // Initialize state safely
   const [isTemporaryChat, setIsTemporaryChat] = useState(false);
+  const initialLoadRef = useRef(false);
+
+  const loadGuestLimits = async (): Promise<GuestLimits | null> => {
+    if (guestLimitsRef.current) return guestLimitsRef.current;
+    if (guestLimitsLoadingRef.current) return null;
+
+    guestLimitsLoadingRef.current = true;
+    try {
+      const res = await fetch('/api/admin/guest-limits');
+      if (!res.ok) return null;
+      const data = await res.json();
+      const limits: GuestLimits = {
+        guestChatLimit: Number(data.guestChatLimit ?? 0),
+        guestResearchLimit: Number(data.guestResearchLimit ?? 0),
+        guestLimitPeriod: data.guestLimitPeriod === 'session' ? 'session' : 'daily',
+      };
+      guestLimitsRef.current = limits;
+      return limits;
+    } catch (err) {
+      console.error('Failed to load guest limits:', err);
+      return null;
+    } finally {
+      guestLimitsLoadingRef.current = false;
+    }
+  };
+
+  const consumeGuestQuota = async (mode: 'chat' | 'research') => {
+    const limits = await loadGuestLimits();
+    if (!limits) return true;
+
+    const limit = mode === 'chat' ? limits.guestChatLimit : limits.guestResearchLimit;
+    if (!Number.isFinite(limit)) return true;
+
+    if (limit <= 0) {
+      toast.error('Guest access is disabled. Please sign in to continue.');
+      return false;
+    }
+
+    try {
+      const storage = limits.guestLimitPeriod === 'session' ? sessionStorage : localStorage;
+      const countKey = `guest_${mode}_count`;
+      const resetKey = `guest_${mode}_reset`;
+
+      if (limits.guestLimitPeriod === 'daily') {
+        const today = new Date().toISOString().slice(0, 10);
+        const lastReset = storage.getItem(resetKey);
+        if (lastReset !== today) {
+          storage.setItem(resetKey, today);
+          storage.setItem(countKey, '0');
+        }
+      }
+
+      const currentCount = Number(storage.getItem(countKey) || '0');
+      if (currentCount >= limit) {
+        toast.error(`Guest limit reached (${limit} ${mode} messages). Please sign in to continue.`);
+        return false;
+      }
+
+      storage.setItem(countKey, String(currentCount + 1));
+      return true;
+    } catch (err) {
+      console.error('Failed to update guest usage:', err);
+      return true;
+    }
+  };
+
+  // Run exactly once on client mount to robustly read from real window URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('temporary-chat') === 'true') {
+      setIsTemporaryChat(true);
+    }
+    // After reading initial state, allow future state-to-URL sync writebacks
+    initialLoadRef.current = true;
+  }, []);
+
+  // Note: We no longer force isTemporaryChat=true for unauthenticated users.
+  // Guest users are routed to /guest and their chats are inherently ephemeral
+  // without needing the temporary chat UI treatment.
+
+  // Synchronize temporary chat state to URL (Only AFTER initial load completes)
+  // Skip for guest route — guests don't need temporary-chat param
+  useEffect(() => {
+    if (!initialLoadRef.current) return;
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/guest')) return;
+
+    const url = new URL(window.location.href);
+    const currentParam = url.searchParams.get('temporary-chat') === 'true';
+
+    // Only update URL if values actually differ to avoid unnecessary history manipulation
+    if (isTemporaryChat !== currentParam) {
+      if (isTemporaryChat) {
+        url.searchParams.set('temporary-chat', 'true');
+      } else {
+        url.searchParams.delete('temporary-chat');
+      }
+      
+      const newUrl = url.pathname + (url.search ? url.search : '');
+      window.history.replaceState(null, '', newUrl);
+    }
+  }, [isTemporaryChat]);
 
   // Update default sources based on chat mode
   // Research mode: always enable web search by default
@@ -480,6 +595,18 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
   }, [params.chatId, chatId]);
 
   useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      if (!chatId) {
+        setNewChatCreated(true);
+        setIsMessagesLoaded(true);
+        setChatId(globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 40));
+      } else if (!isMessagesLoaded) {
+        setNewChatCreated(true);
+        setIsMessagesLoaded(true);
+      }
+      return;
+    }
+
     if (
       chatId &&
       !newChatCreated &&
@@ -504,7 +631,7 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
       setChatId(globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 40));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId, isMessagesLoaded, newChatCreated, messages.length]);
+  }, [authLoading, isAuthenticated, chatId, isMessagesLoaded, newChatCreated, messages?.length]);
 
   useEffect(() => {
     if (isMessagesLoaded && isConfigReady) {
@@ -576,6 +703,11 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
           
           // Update state immediately (force re-render)
           setTitle(titleValue);
+          
+          // Dispatch custom event so Sidebar can update without re-fetching
+          window.dispatchEvent(new CustomEvent('chat-title-updated', {
+            detail: { chatId: message.chatId, title: titleValue }
+          }));
           
           console.log(`[useChat] Title updated in state and document.title`);
         } else {
@@ -684,6 +816,9 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
 
         // Title is now handled reliably via the 'title' event emitted at stream start
         // No fallback needed since optimistic title is emitted immediately
+        
+        // Notify sidebar to refresh chat list (new chat appeared)
+        window.dispatchEvent(new CustomEvent('sidebar-refresh'));
 
         const lastMsg = messagesRef.current[messagesRef.current.length - 1];
         if (!lastMsg) return;
@@ -741,14 +876,39 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
     rewrite = false,
   ) => {
     if (loading || !message) return;
+    if (authLoading) {
+      toast.error('Checking your session. Please try again.');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      if (chatMode === 'research') {
+        toast.error('Please sign in to use research mode.');
+        login();
+        return;
+      }
+
+      const allowed = await consumeGuestQuota('chat');
+      if (!allowed) return;
+    }
+
+    const effectiveTemporaryChat = isTemporaryChat || !isAuthenticated;
+
     setLoading(true);
     setResearchEnded(false);
     setMessageAppeared(false);
 
-    // Only redirect to /c/{chatId} for non-space chats
+    // Only redirect to /c/{chatId} for non-space, authenticated chats
     // Space chats should stay on the current URL
+    // Guest users stay on /guest (their chats are ephemeral)
     if (messages.length <= 1 && !spaceId) {
-      window.history.replaceState(null, '', `/c/${chatId}`);
+      if (!isAuthenticated) {
+        // Guest users stay on /guest
+        window.history.replaceState(null, '', '/guest');
+      } else {
+        const param = isTemporaryChat ? '?temporary-chat=true' : '';
+        window.history.replaceState(null, '', `/c/${chatId}${param}`);
+      }
     }
 
     messageId = messageId ?? globalThis.crypto.randomUUID().slice(0, 14);
@@ -807,9 +967,9 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
           providerId: embeddingModelProvider.providerId,
         },
         systemInstructions: spaceSystemPrompt || localStorage.getItem('systemInstructions'),
-        memoryEnabled: isTemporaryChat ? false : localStorage.getItem('memoryEnabled') !== 'false',
+        memoryEnabled: effectiveTemporaryChat ? false : localStorage.getItem('memoryEnabled') !== 'false',
         spaceId: spaceId,
-        temporaryChat: isTemporaryChat,
+        temporaryChat: effectiveTemporaryChat,
       }),
     });
 
