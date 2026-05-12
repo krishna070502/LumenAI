@@ -12,9 +12,11 @@ COPY src ./src
 COPY public ./public
 COPY drizzle ./drizzle
 
-# Provide dummy variables for build-time static analysis
+# Provide dummy variables and files for build-time static analysis
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 ENV NEON_AUTH_BASE_URL="https://placeholder.com"
+
+RUN mkdir -p data && echo "{}" > data/config.json
 
 RUN yarn build
 
