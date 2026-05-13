@@ -127,11 +127,12 @@ class NvidiaNIMProvider extends BaseModelProvider<NvidiaNIMConfig> {
                     const model = { name, key: id };
 
                     // Heuristics for categorization
-                    if (id.includes('embed') || id.includes('retriever')) {
+                    if (id.includes('embed') || id.includes('retriever') || id.includes('bge')) {
                         if (!embedding.some(existing => existing.key === id)) {
                             embedding.push(model);
                         }
-                    } else if (id.includes('instruct') || id.includes('chat') || id.includes('deepseek') || id.includes('llama') || id.includes('mistral')) {
+                    } else if (!id.includes('rerank') && !id.includes('ranking')) {
+                        // Default to chat model if it is not a retrieval or reranking model
                         if (!chat.some(existing => existing.key === id)) {
                             chat.push(model);
                         }
