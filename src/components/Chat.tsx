@@ -5,9 +5,16 @@ import MessageInput from './MessageInput';
 import MessageBox from './MessageBox';
 import MessageBoxLoading from './MessageBoxLoading';
 import { useChat } from '@/lib/hooks/useChat';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 const Chat = () => {
   const { sections, loading, messageAppeared, messages } = useChat();
+  const pathname = usePathname();
+
+  // Check if we are currently in an active chat to hide padding/spacing on mobile
+  const isChatPage = pathname === '/' || pathname === '/guest' || pathname.startsWith('/c/') || pathname.startsWith('/space/');
+  const hideBottomNav = isChatPage && messages.length > 0;
 
   const [dividerWidth, setDividerWidth] = useState(0);
   const [dividerLeft, setDividerLeft] = useState(0);
@@ -71,7 +78,13 @@ const Chat = () => {
   }, [messages, loading, sections.length]);
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto no-scrollbar pb-32 lg:pb-28">
+    <div 
+      ref={containerRef} 
+      className={cn(
+        "flex-1 overflow-y-auto no-scrollbar lg:pb-28",
+        hideBottomNav ? "pb-24" : "pb-32"
+      )}
+    >
       <div className="max-w-screen-xl mx-auto w-full flex flex-col space-y-6 pt-28 px-4 lg:px-12">
         {sections.map((section, i) => {
           const isLast = i === sections.length - 1;
@@ -94,7 +107,10 @@ const Chat = () => {
         <div ref={messageEnd} className="h-0" />
         {dividerWidth > 0 && (
           <div
-            className="fixed z-40 bottom-20 lg:bottom-6"
+            className={cn(
+              "fixed z-40 lg:bottom-6",
+              hideBottomNav ? "bottom-4" : "bottom-20"
+            )}
             style={{ width: dividerWidth, left: dividerLeft }}
           >
             <div

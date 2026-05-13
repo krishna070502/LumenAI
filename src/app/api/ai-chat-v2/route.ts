@@ -354,6 +354,11 @@ export async function POST(req: Request) {
         const formattedHistory = (history || []).map(([role, content]: [string, string]) => ({ role: role === 'human' ? 'user' : 'assistant', content }));
         console.log(`[ai-chat-v2] Received history with ${formattedHistory.length} messages. Memory count: ${retrievedMemories.length}`);
 
+        // Generate a lightweight chat history context for intent classification and query generation
+        const chatHistoryContext = formattedHistory.length > 0
+            ? formattedHistory.slice(-4).map((m: { role: string; content: string }) => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content.slice(0, 400)}`).join('\n')
+            : '';
+
         // FAST PATH HEURISTICS: Skip classification for simple queries
         // This avoids an LLM call for straightforward conversational messages
         const shouldSkipClassification = (query: string): boolean => {
@@ -385,7 +390,7 @@ export async function POST(req: Request) {
         // MODEL-DRIVEN classification (ChatGPT-style)
         // SEARCH-BY-DEFAULT architecture: Search is ON unless model explicitly says NO with high confidence.
         // This is the production-reliable direction — users perceive "unnecessary search" as far less bad than "no search happened."
-        const classifyIntent = async (query: string): Promise<{ needsSearch: boolean; needsTools: boolean; allowedTools: string[] }> => {
+        const classifyIntent = async (query: string, historyContext: string = ''): Promise<{ needsSearch: boolean; needsTools: boolean; allowedTools: string[] }> => {
             try {
                 const classificationStartTime = Date.now();
                 const classificationTimeout = new Promise<never>((_, reject) => 
@@ -394,7 +399,9 @@ export async function POST(req: Request) {
 
                 const classificationPromise = generateText({
                     model: nim.chatModel('meta/llama-3.1-8b-instruct'),
-                    system: `You are an intent classifier. Determine if the user's query can be answered ENTIRELY from static knowledge (pre-2024 training data), or if it benefits from real-time web search.
+                    system: `You are an intent classifier. Given the latest user message and recent conversation history (if any), determine if the user's query can be answered ENTIRELY from static knowledge (pre-2024 training data), or if it benefits from real-time web search.
+
+Evaluate referential messages (e.g. "tell me more", "go ahead", "how about Apple?") in the context of the recent history.
 
 ANSWER "NO_SEARCH" ONLY if ALL of these are true:
 - The query is about timeless concepts (math, science laws, grammar, coding syntax)
@@ -410,7 +417,7 @@ TOOLS: weather, stocks, calculate, chart, table, news, scrape, media, create_tas
 Respond in EXACTLY this format:
 DECISION: SEARCH or NO_SEARCH
 TOOLS: tool1, tool2 (or "none")`,
-                    prompt: query
+                    prompt: `${historyContext ? `Recent Conversation History:\n${historyContext}\n\n` : ''}Latest User Message: ${query}`
                 });
 
                 const result = await Promise.race([classificationPromise, classificationTimeout]) as any;
@@ -450,7 +457,7 @@ TOOLS: tool1, tool2 (or "none")`,
         let useSearch = sources.length > 0; // User explicitly enabled sources
         let modelSaysNeedsTools = false;
         let allowedToolsList: string[] = [];
-        console.log(`[ai-chat-v2] chatMode: ${chatMode}, sources: [${sources.join(', ')}], initial useSearch: ${useSearch}`);
+        console.log(`[ai-chat-v2] chatMode: ${chatMode}, optimizationMode: ${optimizationMode}, sources: [${sources.join(', ')}], initial useSearch: ${useSearch}`);
 
         // In chat mode with no explicit sources, use fast path or MODEL to decide
         if (chatMode === 'chat' && sources.length === 0) {
@@ -462,7 +469,7 @@ TOOLS: tool1, tool2 (or "none")`,
                 allowedToolsList = [];
             } else {
                 console.log('[ai-chat-v2] Running model-driven intent classification...');
-                const intent = await classifyIntent(message.content);
+                const intent = await classifyIntent(message.content, chatHistoryContext);
                 useSearch = intent.needsSearch;
                 modelSaysNeedsTools = intent.needsTools;
                 allowedToolsList = intent.allowedTools;
@@ -470,11 +477,43 @@ TOOLS: tool1, tool2 (or "none")`,
             }
         }
 
-        const modeInstructions = {
-            speed: 'Be quick and to the point. Short, snappy responses.',
-            balanced: 'Be helpful and informative with a conversational tone.',
-            quality: 'Be thorough and insightful. Provide detailed, well-structured responses.'
-        }[optimizationMode as 'speed' | 'balanced' | 'quality'] || 'Be helpful and informative with a conversational tone.';
+        // Mode-aware search configuration: controls query depth, result limits, and response style
+        const searchConfig = {
+            speed: {
+                maxQueries: 1,           // Single query for fastest response
+                maxResults: 3,           // Fewer results to process
+                maxRankedResults: 3,     // Minimal re-ranking
+                enableReranking: false,  // Skip LLM re-ranking for speed
+                enableSpeculative: true, // Use speculative search for latency
+                queryGenTimeout: 1500,   // Shorter timeout
+                responseStyle: 'Be quick and to the point. Short, snappy responses. Prioritize speed over depth.',
+            },
+            balanced: {
+                maxQueries: 2,           // Two queries for good coverage
+                maxResults: 5,           // Standard result count
+                maxRankedResults: 5,     // Standard re-ranking
+                enableReranking: true,   // Use LLM re-ranking
+                enableSpeculative: true, // Use speculative search when possible
+                queryGenTimeout: 2000,   // Standard timeout
+                responseStyle: 'Be helpful and informative with a conversational tone. Balance thoroughness with conciseness.',
+            },
+            quality: {
+                maxQueries: 3,           // Three queries for comprehensive coverage
+                maxResults: 8,           // More results for deeper analysis
+                maxRankedResults: 8,     // Broader re-ranking pool
+                enableReranking: true,   // Always re-rank for best quality
+                enableSpeculative: false,// Never speculative — always optimize queries first
+                queryGenTimeout: 3000,   // Longer timeout for better queries
+                responseStyle: 'Be thorough, insightful, and detailed. Provide well-structured, comprehensive responses with multiple perspectives. Cite sources extensively. Include analysis, not just facts.',
+            },
+        }[optimizationMode as 'speed' | 'balanced' | 'quality'] || {
+            maxQueries: 2, maxResults: 5, maxRankedResults: 5, enableReranking: true,
+            enableSpeculative: true, queryGenTimeout: 2000,
+            responseStyle: 'Be helpful and informative with a conversational tone.',
+        };
+
+        const modeInstructions = searchConfig.responseStyle;
+        console.log(`[ai-chat-v2] Search config for mode "${optimizationMode}": queries=${searchConfig.maxQueries}, results=${searchConfig.maxResults}, reranking=${searchConfig.enableReranking}`);
 
         const availableCapabilities = [];
         if (sources.includes('web') || useSearch) availableCapabilities.push('Web Search');
@@ -542,6 +581,9 @@ ${documentContext ? `ATTACHED DOCUMENTS:\n${documentContext}` : ''}`;
         const baseSystemPrompt = `${coreIdentity}
 
     ${guestModeNotice}
+
+RESPONSE MODE: ${optimizationMode.toUpperCase()}
+${modeInstructions}
 
 ${contextAndPrefs}
 
@@ -689,6 +731,50 @@ ${contextAndPrefs}`;
             return results;
         };
 
+        // Guard: reformulate referential/garbage search queries using conversation history
+        const isReferentialQuery = (q: string): boolean => {
+            const cleaned = q.toLowerCase().replace(/[^a-z\s]/g, '').trim();
+            if (cleaned.length < 5) return true;
+            const referentialPatterns = /^(yes|no|ok|okay|sure|proceed|go ahead|tell me more|continue|do it|go on|please|thanks|yep|yeah|yea|nah|right|correct|exactly|absolutely|definitely|of course|sounds good|let's go|let's do it|more|elaborate|explain|details)[\s!.?]*$/i;
+            if (referentialPatterns.test(cleaned)) return true;
+            const words = cleaned.split(/\s+/);
+            if (words.length <= 3) {
+                const conversationalWords = ['yes', 'no', 'ok', 'okay', 'sure', 'proceed', 'go', 'ahead', 'tell', 'me', 'more', 'continue', 'do', 'it', 'please', 'thanks', 'yep', 'yeah', 'right', 'that', 'this', 'the', 'a', 'an'];
+                if (words.every(w => conversationalWords.includes(w))) return true;
+            }
+            return false;
+        };
+
+        const reformulateQueries = async (rawQueries: string[]): Promise<string[]> => {
+            // If no history, can't reformulate - return as-is
+            if (!chatHistoryContext) return rawQueries;
+            
+            // Check if ANY query looks referential
+            const needsReformulation = rawQueries.some(q => isReferentialQuery(q));
+            if (!needsReformulation) return rawQueries;
+
+            console.log(`[ai-chat-v2] Reformulating referential queries: [${rawQueries.join(', ')}]`);
+            try {
+                const reformulateTimeout = new Promise<never>((_, reject) => 
+                    setTimeout(() => reject(new Error('Reformulate timeout')), 2500)
+                );
+                const reformulatePromise = generateText({
+                    model: nim.chatModel('meta/llama-3.1-8b-instruct'),
+                    system: 'You are a search query reformulator. The user sent a vague or referential message (like "yes proceed", "tell me more") as a follow-up in a conversation. Using the conversation history, generate 1-2 self-contained, specific search queries that capture what the user actually wants to know. Output ONLY the queries, one per line, no numbering.',
+                    prompt: `Conversation History:\n${chatHistoryContext}\n\nUser's latest message: ${rawQueries[0]}\n\nGenerate specific, standalone search queries:`,
+                });
+                const result = await Promise.race([reformulatePromise, reformulateTimeout]) as any;
+                const reformulated = result.text.trim().split('\n').filter((q: string) => q.trim().length > 3).slice(0, 2);
+                if (reformulated.length > 0) {
+                    console.log(`[ai-chat-v2] Reformulated queries: [${reformulated.join(', ')}]`);
+                    return reformulated;
+                }
+            } catch (err) {
+                console.error('[ai-chat-v2] Query reformulation failed:', err);
+            }
+            return rawQueries; // fallback to originals
+        };
+
         const tools: any = {
             web_search: {
                 description: 'Search the web for real-time information.',
@@ -696,7 +782,11 @@ ${contextAndPrefs}`;
                     queries: z.array(z.string()).optional().describe('An array of search queries.'),
                     query: z.string().optional().describe('A single search query.')
                 }),
-                execute: async (params: any) => executeSearch(params?.queries || params?.query)
+                execute: async (params: any) => {
+                    let queries = params?.queries || (params?.query ? [params.query] : []);
+                    queries = await reformulateQueries(queries);
+                    return executeSearch(queries);
+                }
             },
             academic_search: {
                 description: 'Search academic papers and scholarly articles.',
@@ -704,7 +794,11 @@ ${contextAndPrefs}`;
                     queries: z.array(z.string()).optional().describe('An array of academic search queries.'),
                     query: z.string().optional().describe('A single academic search query.')
                 }),
-                execute: async (params: any) => executeSearch(params?.queries || params?.query, ['google scholar'])
+                execute: async (params: any) => {
+                    let queries = params?.queries || (params?.query ? [params.query] : []);
+                    queries = await reformulateQueries(queries);
+                    return executeSearch(queries, ['google scholar']);
+                }
             },
             social_search: {
                 description: 'Search for discussions on social platforms.',
@@ -712,7 +806,11 @@ ${contextAndPrefs}`;
                     queries: z.array(z.string()).optional().describe('An array of social search queries.'),
                     query: z.string().optional().describe('A single social search query.')
                 }),
-                execute: async (params: any) => executeSearch(params?.queries || params?.query, ['reddit'])
+                execute: async (params: any) => {
+                    let queries = params?.queries || (params?.query ? [params.query] : []);
+                    queries = await reformulateQueries(queries);
+                    return executeSearch(queries, ['reddit']);
+                }
             },
             scrape_url: {
                 description: 'Extract and read the full content of specific URLs.',
@@ -1428,7 +1526,9 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
             const q = message.content.toLowerCase();
             const highProbFactual = /price|stock|ticker|weather|latest|vs|compare|current|score|news|release|version/i.test(q) || q.includes('?');
             
-            if (chatMode === 'chat' && sources.length === 0 && highProbFactual) {
+            // Speculative search handles FIRST questions only. Follow-ups need proper context generation.
+            // Quality mode disables speculative search to always go through LLM query optimization.
+            if (searchConfig.enableSpeculative && chatMode === 'chat' && sources.length === 0 && highProbFactual && formattedHistory.length === 0) {
                 console.log(`[ai-chat-v2] Speculative search triggered for query: ${message.content.slice(0, 50)}...`);
                 // We don't optimize queries yet, just use the raw query for speed
                 speculativeSearchPromise = executeSearch([message.content.slice(0, 200)]);
@@ -1460,26 +1560,27 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                         // Generate optimized search queries using LLM (frontier-tier improvement)
                         let searchQueries: string[];
                         
-                        // Optimization: If the query is short and specific, use it directly to save a round-trip
-                        const isSimpleQuery = message.content.split(/\s+/).length <= 5 && !message.content.includes('?');
+                        // Optimization: If the query is short and specific, use it directly ONLY on the first turn in speed/balanced modes.
+                        // Quality mode ALWAYS generates optimized queries. Follow-ups ALWAYS go through LLM.
+                        const isSimpleQuery = optimizationMode === 'speed' && formattedHistory.length === 0 && message.content.split(/\s+/).length <= 5 && !message.content.includes('?');
                         
                         if (isSimpleQuery) {
-                            console.log('[ai-chat-v2] Simple query detected, skipping LLM query optimization');
+                            console.log('[ai-chat-v2] Simple query detected (speed mode), skipping LLM query optimization');
                             searchQueries = [message.content.trim()];
                         } else {
                             try {
                                 const queryGenTimeout = new Promise<never>((_, reject) => 
-                                    setTimeout(() => reject(new Error('Query gen timeout')), 2000)
+                                    setTimeout(() => reject(new Error('Query gen timeout')), searchConfig.queryGenTimeout)
                                 );
                                 const queryGenPromise = generateText({
                                     model: nim.chatModel('meta/llama-3.1-8b-instruct'),
-                                    system: 'You are a search query optimizer. Generate 2 focused search queries that will find the most relevant information. Output ONLY the queries, one per line, without numbering or bullet points.',
-                                    prompt: `User question: ${message.content}\n\nGenerate 2 optimal search queries:`,
+                                    system: `You are a search query optimizer. Given the user's latest message and recent chat history, generate up to ${searchConfig.maxQueries} focused, independent search queries (self-contained, without referencing pronouns or conversational fragments like "it", "more", "proceed") to find the most relevant information.${optimizationMode === 'quality' ? ' For quality mode, generate diverse queries that cover different angles and perspectives of the topic.' : ''} Output ONLY the queries, one per line, without numbering or quotes.`,
+                                    prompt: `${chatHistoryContext ? `Recent Conversation History:\n${chatHistoryContext}\n\n` : ''}Latest User Message: ${message.content}\n\nGenerate up to ${searchConfig.maxQueries} independent, optimal search queries:`,
                                 });
 
                                 const queryGenResult = await Promise.race([queryGenPromise, queryGenTimeout]) as any;
-                                searchQueries = queryGenResult.text.trim().split('\n').filter((q: string) => q.trim().length > 0).slice(0, 2);
-                                console.log(`[ai-chat-v2] Generated search queries:`, searchQueries);
+                                searchQueries = queryGenResult.text.trim().split('\n').filter((q: string) => q.trim().length > 0).slice(0, searchConfig.maxQueries);
+                                console.log(`[ai-chat-v2] Generated ${searchQueries.length} search queries (mode: ${optimizationMode}):`, searchQueries);
                             } catch (err) {
                                 console.error('[ai-chat-v2] Query generation failed or timed out, using raw user text:', err);
                                 searchQueries = [message.content.slice(0, 200)]; // Fallback
@@ -1497,14 +1598,14 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                     }
 
                     if (searchResults.length > 0) {
-                        // SEMANTIC RE-RANKING (research-grade): Select most relevant sources
+                        // SEMANTIC RE-RANKING: Select most relevant sources (mode-aware)
                         let rankedResults = searchResults;
-                        if (searchResults.length > 5) {
+                        if (searchConfig.enableReranking && searchResults.length > searchConfig.maxResults) {
                             try {
                                 // Cap input results to 20 to keep prompt context bounded and efficient
                                 const candidateResults = searchResults.slice(0, 20);
                                 
-                                const rerankPrompt = `User question: ${message.content}\n\nSearch results (by title):\n${candidateResults.map((r, i) => `${i + 1}. ${r.metadata.title}`).join('\n')}\n\nSelect the 3-5 most relevant result numbers for answering the user's question. Respond with ONLY the numbers, comma-separated (e.g., "1, 4, 7").`;
+                                const rerankPrompt = `User question: ${message.content}\n\nSearch results (by title):\n${candidateResults.map((r, i) => `${i + 1}. ${r.metadata.title}`).join('\n')}\n\nSelect the ${searchConfig.maxRankedResults} most relevant result numbers for answering the user's question. Respond with ONLY the numbers, comma-separated (e.g., "1, 4, 7").`;
 
                                 // Enforce a strict timeout to prevent backend hangs
                                 const timeoutPromise = new Promise<null>((_, reject) => 
@@ -1522,20 +1623,22 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                                 if (rerankResult) {
                                     const selectedIndices = rerankResult.text.match(/\d+/g)?.map((n: string) => parseInt(n) - 1).filter((i: number) => i >= 0 && i < candidateResults.length) || [];
                                     if (selectedIndices.length > 0) {
-                                        rankedResults = selectedIndices.slice(0, 5).map((i: number) => candidateResults[i]);
-                                        console.log(`[ai-chat-v2] Re-ranked search results: selected ${rankedResults.length} most relevant from ${searchResults.length} total`);
+                                        rankedResults = selectedIndices.slice(0, searchConfig.maxRankedResults).map((i: number) => candidateResults[i]);
+                                        console.log(`[ai-chat-v2] Re-ranked search results: selected ${rankedResults.length} most relevant from ${searchResults.length} total (mode: ${optimizationMode})`);
                                     } else {
-                                        rankedResults = searchResults.slice(0, 5);
+                                        rankedResults = searchResults.slice(0, searchConfig.maxResults);
                                     }
                                 } else {
-                                    rankedResults = searchResults.slice(0, 5);
+                                    rankedResults = searchResults.slice(0, searchConfig.maxResults);
                                 }
                             } catch (err) {
-                                console.warn('[ai-chat-v2] Re-ranking failed or timed out, falling back to top 5:', err);
-                                rankedResults = searchResults.slice(0, 5);
+                                console.warn(`[ai-chat-v2] Re-ranking failed or timed out, falling back to top ${searchConfig.maxResults}:`, err);
+                                rankedResults = searchResults.slice(0, searchConfig.maxResults);
                             }
                         } else {
-                            rankedResults = searchResults.slice(0, 5);
+                            // Speed mode or small result set: just take top N without re-ranking
+                            rankedResults = searchResults.slice(0, searchConfig.maxResults);
+                            console.log(`[ai-chat-v2] Using top ${rankedResults.length} results without re-ranking (mode: ${optimizationMode})`);
                         }
 
                         searchContext = `\n\n<search_context already_executed="true">\n${rankedResults.map((r, i) =>

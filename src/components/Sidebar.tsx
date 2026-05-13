@@ -25,6 +25,7 @@ import UserAvatar from './Auth/UserAvatar';
 import AddToSpaceDialog from './AddToSpaceDialog';
 import SearchModal from './SearchModal';
 import { useAuth } from '@/lib/auth/useAuth';
+import { useChat } from '@/lib/hooks/useChat';
 
 interface Chat {
   id: string;
@@ -36,8 +37,13 @@ const Sidebar = ({ children }: { children: React.ReactNode }) => {
   const segments = useSelectedLayoutSegments();
   const router = useRouter();
   const pathname = usePathname();
+  const { messages } = useChat();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
+
+  // Check if we are currently in an active chat page to conditionally hide navbar
+  const isChatPage = pathname === '/' || pathname === '/guest' || pathname.startsWith('/c/') || pathname.startsWith('/space/');
+  const hideBottomNav = isChatPage && messages.length > 0;
   const [loadingChats, setLoadingChats] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [addToSpaceChat, setAddToSpaceChat] = useState<Chat | null>(null);
@@ -406,58 +412,60 @@ const Sidebar = ({ children }: { children: React.ReactNode }) => {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="fixed bottom-0 w-full z-50 flex flex-row items-center justify-around bg-light-secondary dark:bg-dark-secondary px-4 py-4 shadow-sm lg:hidden border-t border-light-200 dark:border-dark-200">
-        {navLinks.filter(link => !link.hideOnMobile).map((link, i) => (
-          'isNewChat' in link && link.isNewChat ? (
-            <button
-              key={i}
-              onClick={handleNewChat}
-              className={cn(
-                'relative flex flex-col items-center space-y-1 text-center',
-                link.active
-                  ? 'text-black dark:text-white'
-                  : 'text-black/60 dark:text-white/60',
-              )}
-            >
-              {link.active && (
-                <div className="absolute top-0 -mt-4 h-1 w-8 rounded-b-lg bg-black dark:bg-white" />
-              )}
-              <link.icon size={22} />
-              <p className="text-xs">{link.label}</p>
-            </button>
-          ) : 'isSearch' in link && link.isSearch ? (
-            <button
-              key={i}
-              onClick={() => setIsSearchOpen(true)}
-              className={cn(
-                'relative flex flex-col items-center space-y-1 text-center',
-                'text-black/60 dark:text-white/60',
-              )}
-            >
-              <link.icon size={22} />
-              <p className="text-xs">{link.label}</p>
-            </button>
-          ) : (
-            <Link
-              href={link.href}
-              key={i}
-              className={cn(
-                'relative flex flex-col items-center space-y-1 text-center',
-                link.active
-                  ? 'text-black dark:text-white'
-                  : 'text-black/60 dark:text-white/60',
-              )}
-            >
-              {link.active && (
-                <div className="absolute top-0 -mt-4 h-1 w-8 rounded-b-lg bg-black dark:bg-white" />
-              )}
-              <link.icon size={22} />
-              <p className="text-xs">{link.label}</p>
-            </Link>
-          )
-        ))}
-        <UserAvatar />
-      </div>
+      {!hideBottomNav && (
+        <div className="fixed bottom-0 w-full z-50 flex flex-row items-center justify-around bg-light-secondary dark:bg-dark-secondary px-4 py-4 shadow-sm lg:hidden border-t border-light-200 dark:border-dark-200">
+          {navLinks.filter(link => !link.hideOnMobile).map((link, i) => (
+            'isNewChat' in link && link.isNewChat ? (
+              <button
+                key={i}
+                onClick={handleNewChat}
+                className={cn(
+                  'relative flex flex-col items-center space-y-1 text-center',
+                  link.active
+                    ? 'text-black dark:text-white'
+                    : 'text-black/60 dark:text-white/60',
+                )}
+              >
+                {link.active && (
+                  <div className="absolute top-0 -mt-4 h-1 w-8 rounded-b-lg bg-black dark:bg-white" />
+                )}
+                <link.icon size={22} />
+                <p className="text-xs">{link.label}</p>
+              </button>
+            ) : 'isSearch' in link && link.isSearch ? (
+              <button
+                key={i}
+                onClick={() => setIsSearchOpen(true)}
+                className={cn(
+                  'relative flex flex-col items-center space-y-1 text-center',
+                  'text-black/60 dark:text-white/60',
+                )}
+              >
+                <link.icon size={22} />
+                <p className="text-xs">{link.label}</p>
+              </button>
+            ) : (
+              <Link
+                href={link.href}
+                key={i}
+                className={cn(
+                  'relative flex flex-col items-center space-y-1 text-center',
+                  link.active
+                    ? 'text-black dark:text-white'
+                    : 'text-black/60 dark:text-white/60',
+                )}
+              >
+                {link.active && (
+                  <div className="absolute top-0 -mt-4 h-1 w-8 rounded-b-lg bg-black dark:bg-white" />
+                )}
+                <link.icon size={22} />
+                <p className="text-xs">{link.label}</p>
+              </Link>
+            )
+          ))}
+          <UserAvatar />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className={cn(

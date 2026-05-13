@@ -1,7 +1,9 @@
-import { Share, Trash, FileText, FileDown } from 'lucide-react';
+import { Share, Trash, FileText, FileDown, ArrowLeft } from 'lucide-react';
 import { Message } from './ChatWindow';
 import { Fragment } from 'react';
 import DeleteChat from './DeleteChat';
+import Link from 'next/link';
+import { useAuth } from '@/lib/auth/useAuth';
 import {
   Popover,
   PopoverButton,
@@ -197,9 +199,31 @@ const exportAsPDF = (sections: Section[], title: string) => {
 
 const Navbar = () => {
   const { sections, chatId, title, isTemporaryChat } = useChat();
+  const { isAuthenticated } = useAuth();
+  const homeUrl = isAuthenticated ? '/' : '/guest';
 
   return (
-    <div className="fixed top-3 right-3 lg:right-6 z-50 flex items-center gap-2">
+    <>
+      {/* Mobile Back Button */}
+      <div className="fixed top-3 left-3 z-50 lg:hidden animate-in fade-in slide-in-from-left-4 duration-300">
+        <a
+          href={homeUrl}
+          className="relative flex items-center justify-center w-10 h-10 backdrop-blur-xl rounded-xl overflow-hidden border border-white/10 dark:border-white/5 shadow-lg shadow-black/5 dark:shadow-black/20 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors duration-200"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
+          }}
+        >
+          <div
+            className="hidden dark:block absolute inset-0"
+            style={{
+              background: 'linear-gradient(135deg, rgba(30,30,40,0.85) 0%, rgba(20,20,30,0.75) 100%)',
+            }}
+          />
+          <ArrowLeft size={18} className="relative z-10" />
+        </a>
+      </div>
+
+      <div className="fixed top-3 right-3 lg:right-6 z-50 flex items-center gap-2">
       {isTemporaryChat && (
         <div className="flex items-center gap-1.5 px-3 py-1.5 backdrop-blur-xl rounded-xl border border-emerald-500/30 bg-emerald-500/10 shadow-lg shadow-emerald-500/5 animate-in fade-in slide-in-from-right-4 duration-300">
           <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -269,6 +293,7 @@ const Navbar = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
