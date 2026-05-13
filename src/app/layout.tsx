@@ -11,6 +11,8 @@ import ThemeProvider from '@/components/theme/Provider';
 import configManager from '@/lib/config';
 import WelcomeAnimation from '@/components/Setup/WelcomeAnimation';
 import { ChatProvider } from '@/lib/hooks/useChat';
+import { AuthProvider } from '@/lib/auth/useAuth';
+import { getCurrentUser } from '@/lib/auth';
 
 const montserrat = Montserrat({
   weight: ['300', '400', '500', '700'],
@@ -36,6 +38,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const setupComplete = configManager.isSetupComplete();
+  const initialUser = await getCurrentUser();
 
   // Get the current path to check if we're on an auth page
   const headersList = await headers();
@@ -47,51 +50,53 @@ export default async function RootLayout({
     <html className="h-full" lang="en" suppressHydrationWarning>
       <body className={cn('h-full antialiased gradient-bg', montserrat.className)} suppressHydrationWarning>
         <ThemeProvider>
-          {!setupComplete ? (
-            <WelcomeAnimation />
-          ) : isAuthPage ? (
-            // Auth pages render without sidebar
-            <>
-              {children}
-              <Toaster
-                toastOptions={{
-                  unstyled: true,
-                  classNames: {
-                    toast:
-                      'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
-                  },
-                }}
-              />
-            </>
-          ) : isGuestPage ? (
-            // Guest pages render with sidebar but ChatProvider is in guest/layout.tsx
-            <>
-              <Sidebar>{children}</Sidebar>
-              <Toaster
-                toastOptions={{
-                  unstyled: true,
-                  classNames: {
-                    toast:
-                      'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
-                  },
-                }}
-              />
-            </>
-          ) : (
-            // Regular pages with sidebar
-            <ChatProvider>
-              <Sidebar>{children}</Sidebar>
-              <Toaster
-                toastOptions={{
-                  unstyled: true,
-                  classNames: {
-                    toast:
-                      'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
-                  },
-                }}
-              />
-            </ChatProvider>
-          )}
+          <AuthProvider initialUser={initialUser}>
+            {!setupComplete ? (
+              <WelcomeAnimation />
+            ) : isAuthPage ? (
+              // Auth pages render without sidebar
+              <>
+                {children}
+                <Toaster
+                  toastOptions={{
+                    unstyled: true,
+                    classNames: {
+                      toast:
+                        'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
+                    },
+                  }}
+                />
+              </>
+            ) : isGuestPage ? (
+              // Guest pages render with sidebar but ChatProvider is in guest/layout.tsx
+              <>
+                <Sidebar>{children}</Sidebar>
+                <Toaster
+                  toastOptions={{
+                    unstyled: true,
+                    classNames: {
+                      toast:
+                        'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
+                    },
+                  }}
+                />
+              </>
+            ) : (
+              // Regular pages with sidebar
+              <ChatProvider>
+                <Sidebar>{children}</Sidebar>
+                <Toaster
+                  toastOptions={{
+                    unstyled: true,
+                    classNames: {
+                      toast:
+                        'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
+                    },
+                  }}
+                />
+              </ChatProvider>
+            )}
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
