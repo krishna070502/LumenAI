@@ -52,6 +52,7 @@ type ChatContext = {
   spaceSystemPrompt: string | null;
   spaceId: string | null;
   isTemporaryChat: boolean;
+  isUploadingFiles: boolean;
   setIsTemporaryChat: (isTemporary: boolean) => void;
   setResearchEnded: (ended: boolean) => void;
   setOptimizationMode: (mode: string) => void;
@@ -67,6 +68,7 @@ type ChatContext = {
   rewrite: (messageId: string) => void;
   setChatModelProvider: (provider: ChatModelProvider) => void;
   setEmbeddingModelProvider: (provider: EmbeddingModelProvider) => void;
+  uploadFiles: (inputFiles: FileList | globalThis.File[]) => Promise<void>;
 };
 
 export interface File {
@@ -288,6 +290,7 @@ export const chatContext = createContext<ChatContext>({
   spaceSystemPrompt: null,
   spaceId: null,
   isTemporaryChat: false,
+  isUploadingFiles: false,
   setIsTemporaryChat: () => { },
   rewrite: () => { },
   sendMessage: async () => { },
@@ -299,6 +302,7 @@ export const chatContext = createContext<ChatContext>({
   setChatModelProvider: () => { },
   setEmbeddingModelProvider: () => { },
   setResearchEnded: () => { },
+  uploadFiles: async () => { },
 });
 
 export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = null }: { children: React.ReactNode; spaceSystemPrompt?: string | null; spaceId?: string | null }) => {
@@ -323,6 +327,7 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
 
   const [files, setFiles] = useState<File[]>([]);
   const [fileIds, setFileIds] = useState<string[]>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
   const [sources, setSources] = useState<string[]>([]);
   const [optimizationMode, setOptimizationMode] = useState('speed');
@@ -1027,6 +1032,75 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
     );
   };
 
+  const uploadFiles = async (inputFiles: FileList | globalThis.File[]) => {
+    if (isUploadingFiles) return;
+    setIsUploadingFiles(true);
+    try {
+      const validMimeTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+      const validExtensions = ['.pdf', '.docx', '.txt'];
+
+      const filesArray = inputFiles instanceof FileList 
+        ? Array.from(inputFiles) 
+        : inputFiles;
+
+      const validFiles: globalThis.File[] = [];
+      const rejectedFiles: string[] = [];
+
+      for (const file of filesArray) {
+        if (!(file instanceof globalThis.File)) continue;
+        
+        const extension = `.${file.name.split('.').pop()?.toLowerCase()}`;
+        if (validMimeTypes.includes(file.type) || validExtensions.includes(extension)) {
+          validFiles.push(file);
+        } else {
+          rejectedFiles.push(file.name);
+        }
+      }
+
+      if (rejectedFiles.length > 0) {
+        toast.error(`Unsupported file type! Currently, only PDF, Word (.docx), and Text (.txt) document types are supported for RAG context. Ignored: ${rejectedFiles.join(', ')}`);
+      }
+
+      if (validFiles.length === 0) return;
+
+      const data = new FormData();
+      for (const file of validFiles) {
+        data.append('files', file);
+      }
+
+      const embeddingModelProvider = localStorage.getItem('embeddingModelProviderId');
+      const embeddingModel = localStorage.getItem('embeddingModelKey');
+
+      data.append('embedding_model_provider_id', embeddingModelProvider!);
+      data.append('embedding_model_key', embeddingModel!);
+
+      const res = await fetch(`/api/uploads`, {
+        method: 'POST',
+        body: data,
+      });
+
+      if (!res.ok) throw new Error(`Upload error ${res.status}`);
+      
+      const resData = await res.json();
+
+      const mappedFiles = resData.files.map((f: any) => ({
+        fileName: f.fileName,
+        fileExtension: f.fileExtension,
+        fileId: f.fileId,
+      }));
+
+      setFiles((prev) => [...prev, ...mappedFiles]);
+      setFileIds((prev) => [...prev, ...resData.files.map((f: any) => f.fileId)]);
+      
+      toast.success(`Successfully uploaded ${validFiles.length} file(s)`);
+    } catch (err) {
+      console.error('[useChat] Upload error:', err);
+      toast.error('Failed to upload files. Please try again.');
+    } finally {
+      setIsUploadingFiles(false);
+    }
+  };
+
   return (
     <chatContext.Provider
       value={{
@@ -1063,6 +1137,8 @@ export const ChatProvider = ({ children, spaceSystemPrompt = null, spaceId = nul
         rewrite,
         setChatModelProvider,
         setEmbeddingModelProvider,
+        isUploadingFiles,
+        uploadFiles,
       }}
     >
       {children}

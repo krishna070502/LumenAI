@@ -1,10 +1,19 @@
 export const POST = async (req: Request) => {
   try {
-    const body: {
+    let body: {
       lat: number;
       lng: number;
       measureUnit: 'Imperial' | 'Metric';
-    } = await req.json();
+    };
+
+    try {
+      body = await req.json();
+    } catch (e) {
+      return Response.json(
+        { message: 'Invalid or empty request body.' },
+        { status: 400 }
+      );
+    }
 
     if (!body.lat || !body.lng) {
       return Response.json(

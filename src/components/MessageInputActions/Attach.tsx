@@ -20,37 +20,14 @@ import { AnimatePresence } from 'motion/react';
 import { motion } from 'framer-motion';
 
 const Attach = () => {
-  const { files, setFiles, setFileIds, fileIds } = useChat();
+  const { files, setFiles, setFileIds, fileIds, isUploadingFiles: loading, uploadFiles } = useChat();
 
-  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<any>();
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLoading(true);
-    const data = new FormData();
-
-    for (let i = 0; i < e.target.files!.length; i++) {
-      data.append('files', e.target.files![i]);
+    if (e.target.files && e.target.files.length > 0) {
+      await uploadFiles(e.target.files);
     }
-
-    const embeddingModelProvider = localStorage.getItem(
-      'embeddingModelProviderId',
-    );
-    const embeddingModel = localStorage.getItem('embeddingModelKey');
-
-    data.append('embedding_model_provider_id', embeddingModelProvider!);
-    data.append('embedding_model_key', embeddingModel!);
-
-    const res = await fetch(`/api/uploads`, {
-      method: 'POST',
-      body: data,
-    });
-
-    const resData = await res.json();
-
-    setFiles([...files, ...resData.files]);
-    setFileIds([...fileIds, ...resData.files.map((file: any) => file.fileId)]);
-    setLoading(false);
   };
 
   return loading ? (
@@ -58,7 +35,7 @@ const Attach = () => {
       <LoaderCircle size={16} className="text-sky-500 animate-spin" />
     </div>
   ) : files.length > 0 ? (
-    <Popover className="relative w-full max-w-[15rem] md:max-w-md lg:max-w-lg">
+    <Popover className="relative">
       {({ open }) => (
         <>
           <PopoverButton

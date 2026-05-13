@@ -49,7 +49,7 @@ const ChatModeToggle = () => {
                                     isActive ? "scale-110" : "group-hover:scale-110"
                                 )}
                             />
-                            <span className="text-[10px] sm:text-xs font-semibold tracking-wide">
+                            <span className="hidden sm:inline text-[10px] sm:text-xs font-semibold tracking-wide">
                                 {mode.label}
                             </span>
                         </div>

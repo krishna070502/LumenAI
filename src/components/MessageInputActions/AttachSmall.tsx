@@ -11,37 +11,14 @@ import { AnimatePresence } from 'motion/react';
 import { motion } from 'framer-motion';
 
 const AttachSmall = () => {
-  const { files, setFiles, setFileIds, fileIds } = useChat();
+  const { files, setFiles, setFileIds, fileIds, isUploadingFiles: loading, uploadFiles } = useChat();
 
-  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<any>();
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setLoading(true);
-    const data = new FormData();
-
-    for (let i = 0; i < e.target.files!.length; i++) {
-      data.append('files', e.target.files![i]);
+    if (e.target.files && e.target.files.length > 0) {
+      await uploadFiles(e.target.files);
     }
-
-    const embeddingModelProvider = localStorage.getItem(
-      'embeddingModelProviderId',
-    );
-    const embeddingModel = localStorage.getItem('embeddingModelKey');
-
-    data.append('embedding_model_provider_id', embeddingModelProvider!);
-    data.append('embedding_model_key', embeddingModel!);
-
-    const res = await fetch(`/api/uploads`, {
-      method: 'POST',
-      body: data,
-    });
-
-    const resData = await res.json();
-
-    setFiles([...files, ...resData.files]);
-    setFileIds([...fileIds, ...resData.files.map((file: any) => file.fileId)]);
-    setLoading(false);
   };
 
   return loading ? (

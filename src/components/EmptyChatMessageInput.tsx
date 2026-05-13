@@ -10,7 +10,8 @@ import ChatModeToggle from './MessageInputActions/ChatModeToggle';
 import { cn } from '@/lib/utils';
 
 const EmptyChatMessageInput = () => {
-  const { sendMessage, isTemporaryChat } = useChat();
+  const { sendMessage, isTemporaryChat, uploadFiles } = useChat();
+  const [isDragging, setIsDragging] = useState(false);
 
   /* const [copilotEnabled, setCopilotEnabled] = useState(false); */
   const [message, setMessage] = useState('');
@@ -41,6 +42,48 @@ const EmptyChatMessageInput = () => {
     };
   }, []);
 
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedItems = e.clipboardData?.items;
+    if (!pastedItems) return;
+
+    const filesToUpload: globalThis.File[] = [];
+    for (let i = 0; i < pastedItems.length; i++) {
+      const item = pastedItems[i];
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file) filesToUpload.push(file);
+      }
+    }
+
+    if (filesToUpload.length > 0) {
+      e.preventDefault();
+      await uploadFiles(filesToUpload);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const droppedFiles = e.dataTransfer?.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      await uploadFiles(droppedFiles);
+    }
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -57,18 +100,26 @@ const EmptyChatMessageInput = () => {
       }}
       className="w-full relative z-20"
     >
-      <div className={cn(
-        "flex flex-col bg-light-secondary/90 dark:bg-dark-secondary/90 backdrop-blur-md px-3 pt-5 pb-3 rounded-2xl w-full border shadow-sm shadow-light-200/10 dark:shadow-black/20 transition-all duration-500 ease-in-out",
-        isTemporaryChat 
-          ? "border-emerald-500/30 focus-within:border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.05)] dark:shadow-[0_0_20px_rgba(16,185,129,0.1)]" 
-          : "border-light-200 dark:border-dark-200 focus-within:border-light-300 dark:focus-within:border-dark-300"
-      )}>
+      <div 
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={cn(
+          "flex flex-col bg-light-secondary/95 dark:bg-dark-secondary/95 backdrop-blur-xl px-4 pt-5 pb-3 rounded-[24px] w-full border shadow-md shadow-light-200/5 dark:shadow-black/25 transition-all duration-500 ease-in-out",
+          isDragging ? "border-sky-500 scale-[1.01] shadow-[0_0_20px_rgba(14,165,233,0.15)]" : (
+            isTemporaryChat 
+              ? "border-emerald-500/30 focus-within:border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.08)] dark:shadow-[0_0_30px_rgba(16,185,129,0.15)]" 
+              : "border-light-200 dark:border-dark-200 focus-within:border-light-300 dark:focus-within:border-dark-300"
+          )
+        )}
+      >
         <TextareaAutosize
           ref={inputRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onPaste={handlePaste}
           minRows={2}
-          className="px-2 bg-transparent placeholder:text-[15px] placeholder:text-black/50 dark:placeholder:text-white/50 text-sm text-black dark:text-white resize-none focus:outline-none w-full max-h-24 lg:max-h-36 xl:max-h-48"
+          className="px-1.5 bg-transparent placeholder:text-[15px] placeholder:text-black/40 dark:placeholder:text-white/40 text-base md:text-sm text-black dark:text-white resize-none focus:outline-none w-full max-h-24 lg:max-h-36 xl:max-h-48"
           placeholder="Ask anything..."
         />
         <div className="flex flex-row items-center justify-between mt-4">

@@ -72,7 +72,7 @@ const ModelSelector = () => {
   }, [filteredModels]);
 
   return (
-    <Popover className="relative w-full max-w-[15rem] md:max-w-md lg:max-w-lg">
+    <Popover className="relative">
       {({ open }) => (
         <>
           <PopoverButton

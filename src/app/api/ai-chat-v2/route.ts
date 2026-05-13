@@ -362,9 +362,11 @@ export async function POST(req: Request) {
             // Skip for very short or empty queries
             if (q.length < 3) return true;
 
-            // Skip for pure greetings and social fillers
-            const greetings = /^(hi|hello|hey|hola|greetings|sup|yo|thanks|thank you|bye|goodbye|ok|okay|cool|nice|good\s*(morning|afternoon|evening))$/i;
-            if (greetings.test(q)) return true;
+            // Skip if ALL tokens in the query are greetings or social filler words
+            const words = q.split(/[\s,.!?;:]+/).filter(Boolean);
+            const greetingWords = new Set(['hi', 'hello', 'hey', 'hola', 'greetings', 'sup', 'yo', 'thanks', 'thank', 'you', 'bye', 'goodbye', 'ok', 'okay', 'cool', 'nice', 'good', 'morning', 'afternoon', 'evening', 'there', 'howdy', 'welcome']);
+            const isAllGreetings = words.length > 0 && words.every(w => greetingWords.has(w));
+            if (isAllGreetings) return true;
 
             // NEGATIVE HEURISTICS: Suppress search for pure code/math/rewriting
             const isMath = /^[0-9+\-*/().\s^%]+=?$/.test(q) || /calculate|square root|log|sin|cos|tan/i.test(q);
@@ -387,7 +389,7 @@ export async function POST(req: Request) {
             try {
                 const classificationStartTime = Date.now();
                 const classificationTimeout = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error('Classification timeout')), 2500)
+                    setTimeout(() => reject(new Error('Classification timeout')), 4000)
                 );
 
                 const classificationPromise = generateText({
