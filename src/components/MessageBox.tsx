@@ -129,6 +129,15 @@ const MessageBox = ({
           className: 'pl-1 text-black/90 dark:text-white/90',
         },
       },
+      table: {
+        component: ({ children, ...props }: any) => (
+          <div className="overflow-x-auto w-full my-6 no-scrollbar rounded-xl border border-light-200 dark:border-dark-200 shadow-sm bg-white/50 dark:bg-dark-secondary/50">
+            <table {...props} className="w-full text-sm border-collapse !my-0">
+              {children}
+            </table>
+          </div>
+        ),
+      },
     },
   };
 
