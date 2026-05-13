@@ -2094,7 +2094,14 @@ Output: {"taskTitle": null, "projectName": "Personal", "dueDate": null, "priorit
         // Execute the main processing loop in the background to allow immediate response
         runWithSearch().catch(err => console.error('[ai-chat-v2] Background runWithSearch error:', err));
 
-        return new Response(responseStream.readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
+        return new Response(responseStream.readable, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache, no-transform',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',
+            }
+        });
 
     } catch (err) { console.error(err); return Response.json({ message: 'Error' }, { status: 500 }); }
 }

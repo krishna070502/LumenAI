@@ -13,6 +13,7 @@ const Chat = () => {
   const [dividerLeft, setDividerLeft] = useState(0);
   const dividerRef = useRef<HTMLDivElement | null>(null);
   const messageEnd = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const lastScrolledRef = useRef<number>(0);
 
   useEffect(() => {
@@ -47,18 +48,30 @@ const Chat = () => {
   }, [sections.length]);
 
   useEffect(() => {
+    const container = containerRef.current;
     const scroll = () => {
       messageEnd.current?.scrollIntoView({ behavior: 'auto' });
     };
 
+    // Always scroll to bottom when a new message exchange starts
     if (sections.length > lastScrolledRef.current) {
       scroll();
       lastScrolledRef.current = sections.length;
+    } 
+    // During streaming, only auto-scroll if the user is already near the bottom
+    else if (loading && container) {
+      const threshold = 150; // px from bottom
+      const isNearBottom = 
+        container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
+      
+      if (isNearBottom) {
+        scroll();
+      }
     }
-  }, [messages]);
+  }, [messages, loading, sections.length]);
 
   return (
-    <div className="flex-1 overflow-y-auto no-scrollbar pb-32 lg:pb-28">
+    <div ref={containerRef} className="flex-1 overflow-y-auto no-scrollbar pb-32 lg:pb-28">
       <div className="max-w-screen-xl mx-auto w-full flex flex-col space-y-6 pt-28 px-4 lg:px-12">
         {sections.map((section, i) => {
           const isLast = i === sections.length - 1;
