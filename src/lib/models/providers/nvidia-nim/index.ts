@@ -15,32 +15,36 @@ interface NvidiaNIMConfig {
 
 const defaultChatModels: Model[] = [
     {
-        name: 'DeepSeek R1',
-        key: 'deepseek-ai/deepseek-r1',
+        name: 'GPT-OSS 120B',
+        key: 'openai/gpt-oss-120b',
+    },
+    {
+        name: 'GPT-OSS 20B',
+        key: 'openai/gpt-oss-20b',
+    },
+    {
+        name: 'DeepSeek V4 Flash',
+        key: 'deepseek-ai/deepseek-v4-flash',
+    },
+    {
+        name: 'DeepSeek V4 Pro',
+        key: 'deepseek-ai/deepseek-v4-pro',
     },
     {
         name: 'Llama 3.3 70B Instruct',
         key: 'meta/llama-3.3-70b-instruct',
     },
     {
-        name: 'Llama 3.1 70B Instruct',
-        key: 'meta/llama-3.1-70b-instruct',
-    },
-    {
-        name: 'Llama 3.1 8B Instruct',
-        key: 'meta/llama-3.1-8b-instruct',
-    },
-    {
-        name: 'Mistral 7B Instruct v0.3',
-        key: 'mistralai/mistral-7b-instruct-v0.3',
-    },
-    {
         name: 'Mixtral 8x7B Instruct',
         key: 'mistralai/mixtral-8x7b-instruct-v0.1',
     },
     {
-        name: 'Nemotron 4 340B Instruct',
-        key: 'nvidia/nemotron-4-340b-instruct',
+        name: 'Mistral Large 3 675B',
+        key: 'mistralai/mistral-large-3-675b-instruct-2512',
+    },
+    {
+        name: 'Nemotron 3 Super 120B',
+        key: 'nvidia/nemotron-3-super-120b-a12b',
     },
 ];
 

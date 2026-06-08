@@ -56,7 +56,7 @@ const ensureChatExists = async (input: { id: string; userId: string; query: stri
 const generateChatTitle = async (query: string, response: string): Promise<string> => {
     try {
         const result = await generateText({
-            model: nim.chatModel('meta/llama-3.1-8b-instruct'), // Using 8B for fast title generation
+            model: nim.chatModel('openai/gpt-oss-20b'), // Using OSS-20B for fast title generation
             system: 'You are a helpful assistant that generates concise chat titles. Generate a short, descriptive title (3-6 words) that summarizes the conversation topic. Output ONLY the title text without any markdown formatting, quotes, or special characters.',
             messages: [
                 { role: 'user', content: query },
@@ -200,8 +200,27 @@ export async function POST(req: Request) {
         
         // Dynamically resolve the user's chosen model and provider
         let activeClient = nim;
-        let activeModelKey = chatModel?.key || 'meta/llama-3.3-70b-instruct';
+        let activeModelKey = chatModel?.key || 'openai/gpt-oss-120b';
         
+        // Server-side migration: remap deprecated model keys to working replacements
+        const DEPRECATED_MODEL_MAP: Record<string, string> = {
+            // Llama 3.1 series (removed from NVIDIA NIM)
+            'meta/llama-3.1-70b-instruct': 'openai/gpt-oss-120b',
+            'meta/llama-3.1-8b-instruct': 'openai/gpt-oss-20b',
+            'meta/llama-3.1-405b-instruct': 'openai/gpt-oss-120b',
+            // DeepSeek R1 (replaced by v4 series)
+            'deepseek-ai/deepseek-r1': 'openai/gpt-oss-120b',
+            // Mistral (removed from NVIDIA NIM)
+            'mistralai/mistral-7b-instruct-v0.3': 'openai/gpt-oss-20b',
+            // Nemotron 4 (removed)
+            'nvidia/nemotron-4-340b-instruct': 'openai/gpt-oss-120b',
+            // Nemotron 70B (removed)
+            'nvidia/llama-3.1-nemotron-70b-instruct': 'openai/gpt-oss-120b',
+        };
+        if (DEPRECATED_MODEL_MAP[activeModelKey]) {
+            console.log(`[ai-chat-v2] Migrating deprecated model "${activeModelKey}" → "${DEPRECATED_MODEL_MAP[activeModelKey]}"`);
+            activeModelKey = DEPRECATED_MODEL_MAP[activeModelKey];
+        }
         if (chatModel?.providerId && chatModel.providerId !== 'nvidia-nim') {
             try {
                 const configProvider = getConfiguredModelProviderById(chatModel.providerId);
@@ -398,7 +417,7 @@ export async function POST(req: Request) {
                 );
 
                 const classificationPromise = generateText({
-                    model: nim.chatModel('meta/llama-3.1-8b-instruct'),
+                    model: nim.chatModel('openai/gpt-oss-20b'),
                     system: `You are an intent classifier. Given the latest user message and recent conversation history (if any), determine if the user's query can be answered ENTIRELY from static knowledge (pre-2024 training data), or if it benefits from real-time web search.
 
 Evaluate referential messages (e.g. "tell me more", "go ahead", "how about Apple?") in the context of the recent history.
@@ -759,7 +778,7 @@ ${contextAndPrefs}`;
                     setTimeout(() => reject(new Error('Reformulate timeout')), 2500)
                 );
                 const reformulatePromise = generateText({
-                    model: nim.chatModel('meta/llama-3.1-8b-instruct'),
+                    model: nim.chatModel('openai/gpt-oss-20b'),
                     system: 'You are a search query reformulator. The user sent a vague or referential message (like "yes proceed", "tell me more") as a follow-up in a conversation. Using the conversation history, generate 1-2 self-contained, specific search queries that capture what the user actually wants to know. Output ONLY the queries, one per line, no numbering.',
                     prompt: `Conversation History:\n${chatHistoryContext}\n\nUser's latest message: ${rawQueries[0]}\n\nGenerate specific, standalone search queries:`,
                 });
@@ -1573,7 +1592,7 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                                     setTimeout(() => reject(new Error('Query gen timeout')), searchConfig.queryGenTimeout)
                                 );
                                 const queryGenPromise = generateText({
-                                    model: nim.chatModel('meta/llama-3.1-8b-instruct'),
+                                    model: nim.chatModel('openai/gpt-oss-20b'),
                                     system: `You are a search query optimizer. Given the user's latest message and recent chat history, generate up to ${searchConfig.maxQueries} focused, independent search queries (self-contained, without referencing pronouns or conversational fragments like "it", "more", "proceed") to find the most relevant information.${optimizationMode === 'quality' ? ' For quality mode, generate diverse queries that cover different angles and perspectives of the topic.' : ''} Output ONLY the queries, one per line, without numbering or quotes.`,
                                     prompt: `${chatHistoryContext ? `Recent Conversation History:\n${chatHistoryContext}\n\n` : ''}Latest User Message: ${message.content}\n\nGenerate up to ${searchConfig.maxQueries} independent, optimal search queries:`,
                                 });
@@ -1613,7 +1632,7 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                                 );
 
                                 const rerankPromise = generateText({
-                                    model: nim.chatModel('meta/llama-3.1-8b-instruct'),
+                                    model: nim.chatModel('openai/gpt-oss-20b'),
                                     system: 'You are a relevance ranker. Select the most relevant search results for answering the user\'s question.',
                                     prompt: rerankPrompt,
                                 });
@@ -1667,7 +1686,7 @@ Write comprehensive, well-researched content. Be thorough and informative.`;
                     try {
                         // Use fast LLM to extract structured parameters
                         const extractionResult = await generateText({
-                            model: nim.chatModel('meta/llama-3.1-8b-instruct'),
+                            model: nim.chatModel('openai/gpt-oss-20b'),
                             system: `Extract task/project details from the user message. Respond ONLY in this exact JSON format, no other text:
 {"taskTitle": "extracted title or null", "projectName": "extracted project name or null", "dueDate": "today|tomorrow|next week|null", "priority": "low|medium|high|null"}
 
@@ -1812,7 +1831,7 @@ Output: {"taskTitle": null, "projectName": "Personal", "dueDate": null, "priorit
                         /create|add|make|new|set|update|mark|show|list|get/i.test(message.content);
 
                     const effectiveToolChoice = isTaskManagementRequest ? 'required' : 'auto';
-                    console.log(`[ai-chat-v2] PASS 1: Multi-step reasoning with tools - Model: llama-3.1-70b`);
+                    console.log(`[ai-chat-v2] PASS 1: Multi-step reasoning with tools - Model: ${activeModelKey}`);
                     console.log(`[ai-chat-v2] Active tools available:`, Object.keys(activeTools));
                     console.log(`[ai-chat-v2] Tool choice mode: ${effectiveToolChoice} (isTaskManagement: ${isTaskManagementRequest})`);
 
@@ -1872,7 +1891,7 @@ Output: {"taskTitle": null, "projectName": "Personal", "dueDate": null, "priorit
 
                                 if (toolResultsSummary) {
                                     const verifyResult = await generateText({
-                                        model: nim.chatModel('meta/llama-3.1-8b-instruct'),
+                                        model: nim.chatModel('openai/gpt-oss-20b'),
                                         system: 'You verify tool execution results. Determine if the tools successfully answered the user\'s question or if there are errors/missing information.',
                                         prompt: `User question: ${message.content}\n\nTools executed:\n${toolResultsSummary}\n\nDid the tools successfully provide the needed information? Respond with:\nSTATUS: SUCCESS or FAILED\nISSUES: (describe any problems, or "none")`,
                                     });
@@ -2118,7 +2137,7 @@ Output: {"taskTitle": null, "projectName": "Personal", "dueDate": null, "priorit
                         // Force quick 3-second timeout to ensure stream completion is not stalled indefinitely
                         const followTimeout = new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000));
                         const followPromise = generateText({
-                            model: nim.chatModel('meta/llama-3.1-8b-instruct'),
+                            model: nim.chatModel('openai/gpt-oss-20b'),
                             system: 'You generate 3 concise, relevant follow-up questions based on a conversation. These help users explore the topic deeper. Output ONLY the questions, one per line, without numbering.',
                             prompt: `User asked: ${message.content}\n\nAssistant answered: ${fullText.slice(0, 500)}\n\nGenerate 3 related follow-up questions the user might want to ask next:`,
                         });

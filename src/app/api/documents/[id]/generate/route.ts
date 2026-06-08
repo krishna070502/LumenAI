@@ -174,7 +174,7 @@ Most important insights`;
             userPrompt = `Summarize this content:\n\n${existingContent}`;
         }
 
-        const model = nvidia('meta/llama-3.3-70b-instruct');
+        const model = nvidia('openai/gpt-oss-120b');
 
         const result = await generateText({
             model,
