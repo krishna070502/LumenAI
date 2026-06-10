@@ -17,19 +17,63 @@ const WeatherWidget = () => {
   const [hasError, setHasError] = useState(false);
 
   const getApproxLocation = async () => {
-    try {
-      const res = await fetch('https://ipwhois.app/json/');
-      const data = await res.json();
+    // Try multiple IP geolocation services as fallbacks
+    const services = [
+      {
+        url: 'https://ipapi.co/json/',
+        parse: (data: any) => ({
+          latitude: data.latitude,
+          longitude: data.longitude,
+          city: data.city,
+        }),
+      },
+      {
+        url: 'https://ipwhois.app/json/',
+        parse: (data: any) => ({
+          latitude: data.latitude,
+          longitude: data.longitude,
+          city: data.city,
+        }),
+      },
+      {
+        url: 'https://ipwho.is/',
+        parse: (data: any) => ({
+          latitude: data.latitude,
+          longitude: data.longitude,
+          city: data.city,
+        }),
+      },
+    ];
 
-      return {
-        latitude: data.latitude,
-        longitude: data.longitude,
-        city: data.city,
-      };
-    } catch (error) {
-      console.error('Failed to get approximate location:', error);
-      return null;
+    for (const service of services) {
+      try {
+        const res = await fetch(service.url);
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        const parsed = service.parse(data);
+
+        // Validate that we got actual numbers
+        if (
+          typeof parsed.latitude === 'number' &&
+          typeof parsed.longitude === 'number' &&
+          !isNaN(parsed.latitude) &&
+          !isNaN(parsed.longitude)
+        ) {
+          return {
+            latitude: parsed.latitude,
+            longitude: parsed.longitude,
+            city: parsed.city || 'Unknown',
+          };
+        }
+      } catch (error) {
+        console.warn(`IP geolocation service ${service.url} failed:`, error);
+        continue;
+      }
     }
+
+    console.error('All IP geolocation services failed');
+    return null;
   };
 
   const getLocation = async (
