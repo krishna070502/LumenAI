@@ -15,7 +15,7 @@ export const POST = async (req: Request) => {
       );
     }
 
-    if (!body.lat || !body.lng) {
+    if (body.lat == null || body.lng == null || (body.lat === 0 && body.lng === 0)) {
       return Response.json(
         {
           message: 'Invalid request.',

@@ -28,11 +28,7 @@ const WeatherWidget = () => {
       };
     } catch (error) {
       console.error('Failed to get approximate location:', error);
-      return {
-        latitude: 0,
-        longitude: 0,
-        city: 'Unknown',
-      };
+      return null;
     }
   };
 
@@ -73,23 +69,47 @@ const WeatherWidget = () => {
               callback({
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
-                city: data.locality || data.city || 'Unknown',
+                city: data.locality || data.city || 'Your Location',
               });
             } catch (error) {
-              console.error('Failed to reverse geocode:', error);
-              callback(await getApproxLocation());
+              console.error('Failed to reverse geocode, using GPS coords:', error);
+              // Still use the valid GPS coordinates even if reverse geocoding fails
+              callback({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                city: 'Your Location',
+              });
             }
           },
           async (error) => {
             console.error('Geolocation error:', error);
-            callback(await getApproxLocation());
+            const approx = await getApproxLocation();
+            if (approx) {
+              callback(approx);
+            } else {
+              setHasError(true);
+              setLoading(false);
+            }
           },
+          { timeout: 10000 },
         );
       } else if (result && result.state === 'prompt') {
-        callback(await getApproxLocation());
+        const approx = await getApproxLocation();
+        if (approx) {
+          callback(approx);
+        } else {
+          setHasError(true);
+          setLoading(false);
+        }
         navigator.geolocation.getCurrentPosition((position) => {});
       } else if (result && result.state === 'denied') {
-        callback(await getApproxLocation());
+        const approx = await getApproxLocation();
+        if (approx) {
+          callback(approx);
+        } else {
+          setHasError(true);
+          setLoading(false);
+        }
       } else if (!result) {
         // Fallback for missing permissions API: try to get position directly
         navigator.geolocation.getCurrentPosition(
@@ -103,19 +123,37 @@ const WeatherWidget = () => {
               callback({
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
-                city: data.locality || data.city || 'Unknown',
+                city: data.locality || data.city || 'Your Location',
               });
             } catch (error) {
-              callback(await getApproxLocation());
+              // Still use the valid GPS coordinates
+              callback({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                city: 'Your Location',
+              });
             }
           },
           async () => {
-            callback(await getApproxLocation());
+            const approx = await getApproxLocation();
+            if (approx) {
+              callback(approx);
+            } else {
+              setHasError(true);
+              setLoading(false);
+            }
           },
+          { timeout: 10000 },
         );
       }
     } else {
-      callback(await getApproxLocation());
+      const approx = await getApproxLocation();
+      if (approx) {
+        callback(approx);
+      } else {
+        setHasError(true);
+        setLoading(false);
+      }
     }
   };
 
