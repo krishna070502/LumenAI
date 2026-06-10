@@ -1,5 +1,5 @@
 import { Cloud, Sun, CloudRain, CloudSnow, Wind } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 const WeatherWidget = () => {
   const [data, setData] = useState({
@@ -15,6 +15,14 @@ const WeatherWidget = () => {
 
   const [loading, setLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+
+  // Cache location so we don't re-trigger GPS/IP lookups every refresh
+  const cachedLocation = useRef<{
+    latitude: number;
+    longitude: number;
+    city: string;
+  } | null>(null);
+  const geoFailed = useRef(false);
 
   const getApproxLocation = async () => {
     // Try multiple IP geolocation services as fallbacks
@@ -66,13 +74,13 @@ const WeatherWidget = () => {
             city: parsed.city || 'Unknown',
           };
         }
-      } catch (error) {
-        console.warn(`IP geolocation service ${service.url} failed:`, error);
+      } catch {
+        // Silently try next service
         continue;
       }
     }
 
-    console.error('All IP geolocation services failed');
+    console.warn('All IP geolocation services failed');
     return null;
   };
 
@@ -83,121 +91,143 @@ const WeatherWidget = () => {
       city: string;
     }) => void,
   ) => {
-    if (navigator.geolocation) {
-      let result: PermissionStatus | null = null;
-      try {
-        if (navigator.permissions && navigator.permissions.query) {
-          result = await navigator.permissions.query({
-            name: 'geolocation',
-          });
-        }
-      } catch (e) {
-        console.warn('Permissions API not supported or failed:', e);
-      }
+    // Return cached location on subsequent calls (weather refreshes)
+    if (cachedLocation.current) {
+      callback(cachedLocation.current);
+      return;
+    }
 
-      if (result && result.state === 'granted') {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            try {
-              const res = await fetch(
-                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
-                {
-                  method: 'GET',
-                },
-              );
-
-              if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-
-              const data = await res.json();
-
-              callback({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                city: data.locality || data.city || 'Your Location',
-              });
-            } catch (error) {
-              console.error('Failed to reverse geocode, using GPS coords:', error);
-              // Still use the valid GPS coordinates even if reverse geocoding fails
-              callback({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                city: 'Your Location',
-              });
-            }
-          },
-          async (error) => {
-            console.error('Geolocation error:', error);
-            const approx = await getApproxLocation();
-            if (approx) {
-              callback(approx);
-            } else {
-              setHasError(true);
-              setLoading(false);
-            }
-          },
-          { timeout: 10000 },
-        );
-      } else if (result && result.state === 'prompt') {
-        const approx = await getApproxLocation();
-        if (approx) {
-          callback(approx);
-        } else {
-          setHasError(true);
-          setLoading(false);
-        }
-        navigator.geolocation.getCurrentPosition((position) => {});
-      } else if (result && result.state === 'denied') {
-        const approx = await getApproxLocation();
-        if (approx) {
-          callback(approx);
-        } else {
-          setHasError(true);
-          setLoading(false);
-        }
-      } else if (!result) {
-        // Fallback for missing permissions API: try to get position directly
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            try {
-              const res = await fetch(
-                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
-                { method: 'GET' },
-              );
-              const data = await res.json();
-              callback({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                city: data.locality || data.city || 'Your Location',
-              });
-            } catch (error) {
-              // Still use the valid GPS coordinates
-              callback({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                city: 'Your Location',
-              });
-            }
-          },
-          async () => {
-            const approx = await getApproxLocation();
-            if (approx) {
-              callback(approx);
-            } else {
-              setHasError(true);
-              setLoading(false);
-            }
-          },
-          { timeout: 10000 },
-        );
-      }
-    } else {
+    // If GPS already failed once, skip straight to IP geolocation
+    if (geoFailed.current || !navigator.geolocation) {
       const approx = await getApproxLocation();
       if (approx) {
+        cachedLocation.current = approx;
         callback(approx);
       } else {
         setHasError(true);
         setLoading(false);
       }
+      return;
+    }
+
+    let result: PermissionStatus | null = null;
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        result = await navigator.permissions.query({
+          name: 'geolocation',
+        });
+      }
+    } catch (e) {
+      // Permissions API not supported — will try getCurrentPosition directly
+    }
+
+    if (result && result.state === 'granted') {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const res = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
+              {
+                method: 'GET',
+              },
+            );
+
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+
+            const data = await res.json();
+
+            const loc = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              city: data.locality || data.city || 'Your Location',
+            };
+            cachedLocation.current = loc;
+            callback(loc);
+          } catch (error) {
+            // Still use the valid GPS coordinates even if reverse geocoding fails
+            const loc = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              city: 'Your Location',
+            };
+            cachedLocation.current = loc;
+            callback(loc);
+          }
+        },
+        async () => {
+          // GPS unavailable (common on desktop Macs) — fall back to IP silently
+          geoFailed.current = true;
+          const approx = await getApproxLocation();
+          if (approx) {
+            cachedLocation.current = approx;
+            callback(approx);
+          } else {
+            setHasError(true);
+            setLoading(false);
+          }
+        },
+        { timeout: 10000 },
+      );
+    } else if (result && result.state === 'prompt') {
+      const approx = await getApproxLocation();
+      if (approx) {
+        cachedLocation.current = approx;
+        callback(approx);
+      } else {
+        setHasError(true);
+        setLoading(false);
+      }
+      navigator.geolocation.getCurrentPosition(() => {});
+    } else if (result && result.state === 'denied') {
+      geoFailed.current = true;
+      const approx = await getApproxLocation();
+      if (approx) {
+        cachedLocation.current = approx;
+        callback(approx);
+      } else {
+        setHasError(true);
+        setLoading(false);
+      }
+    } else if (!result) {
+      // Fallback for missing permissions API: try to get position directly
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const res = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
+              { method: 'GET' },
+            );
+            const data = await res.json();
+            const loc = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              city: data.locality || data.city || 'Your Location',
+            };
+            cachedLocation.current = loc;
+            callback(loc);
+          } catch (error) {
+            const loc = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              city: 'Your Location',
+            };
+            cachedLocation.current = loc;
+            callback(loc);
+          }
+        },
+        async () => {
+          geoFailed.current = true;
+          const approx = await getApproxLocation();
+          if (approx) {
+            cachedLocation.current = approx;
+            callback(approx);
+          } else {
+            setHasError(true);
+            setLoading(false);
+          }
+        },
+        { timeout: 10000 },
+      );
     }
   };
 
@@ -242,9 +272,10 @@ const WeatherWidget = () => {
 
   useEffect(() => {
     updateWeather();
+    // Refresh weather every 5 minutes (weather doesn't change faster than that)
     const intervalId = setInterval(() => {
       if (!hasError) updateWeather();
-    }, 30 * 1000);
+    }, 5 * 60 * 1000);
     return () => clearInterval(intervalId);
   }, [hasError]);
 
