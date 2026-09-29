@@ -174,7 +174,7 @@ Most important insights`;
             userPrompt = `Summarize this content:\n\n${existingContent}`;
         }
 
-        const model = nvidia('openai/gpt-oss-120b');
+        const model = nvidia('nvidia/nemotron-3-super-120b-a12b');
 
         const result = await generateText({
             model,

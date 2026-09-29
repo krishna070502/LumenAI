@@ -15,10 +15,6 @@ interface NvidiaNIMConfig {
 
 const defaultChatModels: Model[] = [
     {
-        name: 'GPT-OSS 120B',
-        key: 'openai/gpt-oss-120b',
-    },
-    {
         name: 'GPT-OSS 20B',
         key: 'openai/gpt-oss-20b',
     },

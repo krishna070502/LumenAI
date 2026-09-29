@@ -200,22 +200,24 @@ export async function POST(req: Request) {
         
         // Dynamically resolve the user's chosen model and provider
         let activeClient = nim;
-        let activeModelKey = chatModel?.key || 'openai/gpt-oss-120b';
+        let activeModelKey = chatModel?.key || 'nvidia/nemotron-3-super-120b-a12b';
         
         // Server-side migration: remap deprecated model keys to working replacements
         const DEPRECATED_MODEL_MAP: Record<string, string> = {
+            // GPT-OSS 120B (end of life 2026-09-03)
+            'openai/gpt-oss-120b': 'nvidia/nemotron-3-super-120b-a12b',
             // Llama 3.1 series (removed from NVIDIA NIM)
-            'meta/llama-3.1-70b-instruct': 'openai/gpt-oss-120b',
+            'meta/llama-3.1-70b-instruct': 'nvidia/nemotron-3-super-120b-a12b',
             'meta/llama-3.1-8b-instruct': 'openai/gpt-oss-20b',
-            'meta/llama-3.1-405b-instruct': 'openai/gpt-oss-120b',
+            'meta/llama-3.1-405b-instruct': 'nvidia/nemotron-3-super-120b-a12b',
             // DeepSeek R1 (replaced by v4 series)
-            'deepseek-ai/deepseek-r1': 'openai/gpt-oss-120b',
+            'deepseek-ai/deepseek-r1': 'nvidia/nemotron-3-super-120b-a12b',
             // Mistral (removed from NVIDIA NIM)
             'mistralai/mistral-7b-instruct-v0.3': 'openai/gpt-oss-20b',
             // Nemotron 4 (removed)
-            'nvidia/nemotron-4-340b-instruct': 'openai/gpt-oss-120b',
+            'nvidia/nemotron-4-340b-instruct': 'nvidia/nemotron-3-super-120b-a12b',
             // Nemotron 70B (removed)
-            'nvidia/llama-3.1-nemotron-70b-instruct': 'openai/gpt-oss-120b',
+            'nvidia/llama-3.1-nemotron-70b-instruct': 'nvidia/nemotron-3-super-120b-a12b',
         };
         if (DEPRECATED_MODEL_MAP[activeModelKey]) {
             console.log(`[ai-chat-v2] Migrating deprecated model "${activeModelKey}" → "${DEPRECATED_MODEL_MAP[activeModelKey]}"`);

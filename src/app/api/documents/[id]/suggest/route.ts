@@ -69,7 +69,7 @@ RULES:
 
         const userPrompt = textToComplete;
 
-        const model = nvidia('openai/gpt-oss-120b');
+        const model = nvidia('nvidia/nemotron-3-super-120b-a12b');
 
         const result = await generateText({
             model,

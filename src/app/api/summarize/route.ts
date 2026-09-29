@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await generateText({
-            model: nim.chatModel('openai/gpt-oss-120b'),
+            model: nim.chatModel('nvidia/nemotron-3-super-120b-a12b'),
             system: `You are an expert summarizer. Create a clear, concise summary of the article content provided.
 
 Guidelines:
