@@ -141,9 +141,21 @@ class ConfigManager {
       );
     } else {
       try {
-        this.currentConfig = JSON.parse(
-          fs.readFileSync(this.configPath, 'utf-8'),
-        );
+        const parsed = JSON.parse(fs.readFileSync(this.configPath, 'utf-8'));
+        /* Merge over defaults so partial files (e.g. "{}") stay valid */
+        this.currentConfig = {
+          ...this.currentConfig,
+          ...parsed,
+          preferences: { ...this.currentConfig.preferences, ...parsed?.preferences },
+          personalization: {
+            ...this.currentConfig.personalization,
+            ...parsed?.personalization,
+          },
+          modelProviders: Array.isArray(parsed?.modelProviders)
+            ? parsed.modelProviders
+            : [],
+          search: { ...this.currentConfig.search, ...parsed?.search },
+        };
       } catch (err) {
         if (err instanceof SyntaxError) {
           console.error(
