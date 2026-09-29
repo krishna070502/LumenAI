@@ -4,15 +4,17 @@
 #   /docker-compose.coolify.yaml
 # Then:
 #   1. Environment Variables tab: set DATABASE_URL, NEON_AUTH_BASE_URL,
-#      ADMIN_EMAIL and any provider API keys (see .env.example).
-#      Coolify shows the ${VAR:?} ones as required and auto-generates
-#      SERVICE_PASSWORD_SEARXNG.
+#      ADMIN_EMAIL, SEARXNG_API_URL (your external SearXNG, e.g.
+#      https://search.example.com) and any provider API keys (see
+#      .env.example). Coolify shows the ${VAR:?} ones as required.
+#      Tip: untick "Build Variable" on all of them; the app only needs them
+#      at runtime.
 #   2. Domain: set it on the `lumenai` service (Coolify generates
 #      SERVICE_FQDN_LUMENAI_3000 and the Traefik/Caddy routing). Do NOT
 #      publish ports or add labels/networks — Coolify manages those.
 #   3. Set NEXT_PUBLIC_APP_URL to the same https:// domain.
 #
-# Postgres + auth are external (Neon), so no database service is defined.
+# Postgres + auth (Neon) and SearXNG are external, so no such services here.
 
 services:
   lumenai:
@@ -20,9 +22,6 @@ services:
       context: .
       dockerfile: Dockerfile.slim
     restart: unless-stopped
-    depends_on:
-      searxng:
-        condition: service_healthy
     environment:
       - SERVICE_FQDN_LUMENAI_3000
       - NODE_ENV=production
@@ -32,7 +31,7 @@ services:
       - NEON_AUTH_BASE_URL=${NEON_AUTH_BASE_URL:?}
       - ADMIN_EMAIL=${ADMIN_EMAIL:?}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-$SERVICE_FQDN_LUMENAI}
-      - SEARXNG_API_URL=http://searxng:8080
+      - SEARXNG_API_URL=${SEARXNG_API_URL:?}
       - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
       - NVIDIA_NIM_BASE_URL=${NVIDIA_NIM_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -57,21 +56,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
-
-  searxng:
-    image: searxng/searxng:latest
-    restart: unless-stopped
-    environment:
-      - SEARXNG_SECRET=${SERVICE_PASSWORD_SEARXNG}
-      - SEARXNG_BASE_URL=http://searxng:8080/
-    volumes:
-      - ./searxng/settings.yml:/etc/searxng/settings.yml
-    healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1']
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
 
 volumes:
   lumenai-data:
