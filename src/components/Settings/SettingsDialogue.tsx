@@ -4,6 +4,7 @@ import {
   Brain,
   BrainCog,
   ChevronLeft,
+  Code2,
   ExternalLink,
   Search,
   Sliders,
@@ -21,6 +22,7 @@ import SearchSection from './Sections/Search';
 import Personalization from './Sections/Personalization';
 import MemorySection from './Sections/Memory';
 import GuestLimits from './Sections/GuestLimits';
+import DeveloperSection from './Sections/Developer';
 import { useAdmin } from '@/lib/auth/useAdmin';
 
 const allSections = [
@@ -77,6 +79,15 @@ const allSections = [
     component: GuestLimits,
     dataAdd: 'guestLimits',
     adminOnly: true,
+  },
+  {
+    key: 'developer',
+    name: 'Developer',
+    description: 'About the developer of this app.',
+    icon: Code2,
+    component: DeveloperSection,
+    dataAdd: 'developer',
+    adminOnly: false,
   },
 ];
 
