@@ -1,0 +1,77 @@
+# LumenAI — Coolify deployment
+#
+# Coolify: New Resource -> Docker Compose (from Git repo) -> Compose file:
+#   /docker-compose.coolify.yaml
+# Then:
+#   1. Environment Variables tab: set DATABASE_URL, NEON_AUTH_BASE_URL,
+#      ADMIN_EMAIL and any provider API keys (see .env.example).
+#      Coolify shows the ${VAR:?} ones as required and auto-generates
+#      SERVICE_PASSWORD_SEARXNG.
+#   2. Domain: set it on the `lumenai` service (Coolify generates
+#      SERVICE_FQDN_LUMENAI_3000 and the Traefik/Caddy routing). Do NOT
+#      publish ports or add labels/networks — Coolify manages those.
+#   3. Set NEXT_PUBLIC_APP_URL to the same https:// domain.
+#
+# Postgres + auth are external (Neon), so no database service is defined.
+
+services:
+  lumenai:
+    build:
+      context: .
+      dockerfile: Dockerfile.slim
+    restart: unless-stopped
+    depends_on:
+      searxng:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_LUMENAI_3000
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL:?}
+      - NEON_AUTH_BASE_URL=${NEON_AUTH_BASE_URL:?}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:?}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-$SERVICE_FQDN_LUMENAI}
+      - SEARXNG_API_URL=http://searxng:8080
+      - NVIDIA_NIM_API_KEY=${NVIDIA_NIM_API_KEY:-}
+      - NVIDIA_NIM_BASE_URL=${NVIDIA_NIM_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - XAI_BASE_URL=${XAI_BASE_URL:-}
+    volumes:
+      # config.json + uploads/ both live under ./data
+      - lumenai-data:/home/gradia-aiengine/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      - SEARXNG_SECRET=${SERVICE_PASSWORD_SEARXNG}
+      - SEARXNG_BASE_URL=http://searxng:8080/
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  lumenai-data:
